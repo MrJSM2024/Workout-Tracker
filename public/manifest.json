@@ -1,0 +1,19 @@
+{
+  "name": "Chess",
+  "short_name": "Chess",
+  "description": "Play chess against the Stockfish engine",
+  "start_url": "/workout-tracker/",
+  "scope": "/workout-tracker/",
+  "display": "standalone",
+  "background_color": "#1a1108",
+  "theme_color": "#1a1108",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/workout-tracker/chess-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
