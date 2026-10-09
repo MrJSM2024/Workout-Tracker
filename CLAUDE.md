@@ -8,7 +8,7 @@ installed to the owner's Android home screen.
 ## Owner
 GitHub: mrjsm2024
 Repo: workout-tracker (name kept for the URL)
-Live URL: https://mrjsm2024.github.io/workout-tracker/
+Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages paths are case-sensitive)
 
 ## Tech
 - Single file `app/index.html` (vanilla HTML/CSS/JS). No build step, no dependencies.
