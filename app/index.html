@@ -412,7 +412,7 @@ function addEntry(e) {
 }
 function entryHtml(e) {
   const t = new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const what = e.dose > 0 ? `${mg(e.dose)} · ${esc(REASONS[e.reason] || e.reason)}${e.note ? ' · ' + esc(e.note) : ''}` : 'Off day confirmed';
+  const what = e.dose > 0 ? `${mg(e.dose)} · ${esc(REASONS[e.reason] || e.reason)}${e.note ? ' · ' + esc(e.note) : ''}` : e.note ? `Note: ${esc(e.note)}` : 'Off day confirmed';
   return `<div class="entry">${what} · logged ${t}
     <button data-del="${e.id}">delete</button></div>`;
 }
@@ -609,7 +609,7 @@ function logText() {
   const start = S.entries.length && S.entries[0].date < st.startDate ? S.entries[0].date : st.startDate;
   for (let d = start; d <= today; d = addDays(d, 1)) {
     const i = dayInfo(d);
-    const es = i.entries.filter(e => e.dose > 0).map(e =>
+    const es = i.entries.filter(e => e.dose > 0 || e.note).map(e => e.dose === 0 ? `note: "${e.note}"` :
       `${e.dose} ${REASONS[e.reason] || e.reason}${e.note ? ' "' + e.note + '"' : ''}${e.reason === 'backfill' ? '' : ' @' + new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
     const none = !i.entries.length && (!firstLogged() || d < firstLogged());
     lines.push(`${d} | ${none ? '-' : +i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : none ? 'not logged' : 'off')}`);
