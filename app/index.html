@@ -457,6 +457,7 @@ function renderSettings() {
     <div class="row">
       <button class="secondary" id="bk">Back up</button>
       <button class="secondary" id="csv">Export CSV</button>
+      <button class="secondary" id="copy">Copy log as text</button>
       <button class="secondary" id="restore">Restore</button>
       <input type="file" id="file" accept=".json,application/json" class="hidden">
     </div>
@@ -489,6 +490,7 @@ function renderSettings() {
 
   $('#bk').onclick = backup;
   $('#csv').onclick = exportCsv;
+  $('#copy').onclick = copyLog;
   $('#restore').onclick = () => $('#file').click();
   $('#file').onchange = restore;
   $('#s-save').onclick = () => {
@@ -537,6 +539,27 @@ async function backup() {
   const name = `dose-log-backup-${logicalToday()}.json`;
   const ok = await shareOrDownload(name, JSON.stringify({ app: 'doselog', version: 1, exportedAt: new Date().toISOString(), data: S }, null, 2), 'application/json');
   if (ok) { S.settings.lastBackup = new Date().toISOString(); save(); render(); }
+}
+// Plain-text log for pasting into a chat or note.
+function logText() {
+  const st = S.settings, today = logicalToday();
+  const lines = [`DOSE LOG (${st.medName}), exported ${today}`,
+    `Plan start: ${st.startDate}. Current interval: ${intervalName(intervalOn(today))}.`,
+    `Interval history: ${[...st.intervals].sort((a, b) => a.from.localeCompare(b.from)).map(i => `${i.from} ${intervalName(i.every)}`).join('; ')}`,
+    '', 'date | total mg | entries (dose, reason, note, time logged)'];
+  const start = S.entries.length && S.entries[0].date < st.startDate ? S.entries[0].date : st.startDate;
+  for (let d = start; d <= today; d = addDays(d, 1)) {
+    const i = dayInfo(d);
+    const es = i.entries.filter(e => e.dose > 0).map(e =>
+      `${e.dose} ${REASONS[e.reason] || e.reason}${e.note ? ' "' + e.note + '"' : ''} @${new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+    lines.push(`${d} | ${+i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : 'off')}`);
+  }
+  return lines.join('\n');
+}
+async function copyLog() {
+  const t = logText();
+  try { await navigator.clipboard.writeText(t); alert('Copied. Paste it into your chat or note.'); }
+  catch (e) { shareOrDownload(`dose-log-${logicalToday()}.txt`, t, 'text/plain'); }
 }
 function exportCsv() {
   const q = s => `"${String(s).replace(/"/g, '""')}"`;
