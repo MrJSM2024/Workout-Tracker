@@ -552,6 +552,15 @@ function renderSettings() {
     <button class="primary" id="s-save">Save settings</button>
   </div>
   <div class="card rules"><details><summary>Plan rules (reference)</summary>
+    <p><b>Patterns</b></p>
+    <ul>
+      <li><b>Normal:</b> 0.125 → 0 → 0.125 → 0 → 0.125</li>
+      <li><b>Hard day:</b> 0.25 → 0 → 0 → 0.125</li>
+      <li><b>Hard 2 days:</b> 0.25 → 0.25 → 0 → 0 → 0.125</li>
+      <li><b>Hard 3 days, same emergency:</b> 0.25 → 0.25 → 0.25 → 0 → 0 → 0.125. No 4th day of 0.25; if the emergency is still going on day 4, get medical advice. From Oct 21, if off days have felt fine: 3 off days after a 3-day run is OK.</li>
+      <li><b>Hard day during the 2 off-days:</b> 0.25 → 0 → 0.25 → 0 → 0 → 0.125. The new 0.25 restarts the count.</li>
+    </ul>
+    <p><b>Detailed rules</b></p>
     <ul>
       <li><b>A day:</b> a dose before 6 AM, or marked "haven't slept yet", belongs to the previous day. Day total: 0 off, 0.125 bridge, 0.25 to 0.375 high, 0.5+ very high.</li>
       <li><b>After a bridge day:</b> next 0.125 after the current interval.</li>
