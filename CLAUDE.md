@@ -33,6 +33,8 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   if no tremor dose in the last 14 days.
 - Interval "none": no scheduled 0.125, nothing follows a high day.
 - Tremor dose: warn if any dose yesterday.
+- "Other medication" entries (reason othermed) are notes only: dose 0, amount + name in the note.
+  The day after one, a due 0.125 shows as "0.125 or off" (owner decides).
 - Widening (2 → 3 → 4 → 7 → none) by button only. Warn if before bridge start + 14, under 14 days
   at the step, or any tremor dose in the last 14 days. High days never change the interval.
 - Hard limits (warn, never block): above 0.25/day unless sleep exception (max 0.375), 0.125 two days

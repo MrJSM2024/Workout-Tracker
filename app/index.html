@@ -102,6 +102,7 @@ const REASONS = {
   sleep: 'Sleep exception (acute stress keeping me up)',
   tremor: 'Tremor / tingling / twitching, no trigger',
   late: 'Missed dose, taken late',
+  othermed: 'Other medication (not counted in totals)',
   other: 'Other',
 };
 const INTERVAL_STEPS = [2, 3, 4, 7, 0]; // 0 = none
@@ -181,8 +182,18 @@ function tremorDaysIn(endDate, days) {
   return new Set(S.entries.filter(e => e.reason === 'tremor' && e.dose > 0 && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date)).size;
 }
 
-// What the plan says for `date`, based only on days before it.
+// Another medication yesterday is not counted in totals; the owner decides: off day or 0.125.
 function planFor(date) {
+  const p = planCore(date);
+  const other = dayInfo(addDays(date, -1)).entries.filter(e => e.reason === 'othermed');
+  if (p && p.kind === 'due' && other.length) {
+    p.head = '0.125 or off';
+    p.notes = [{ cls: 'warn', t: `Yesterday: ${other.map(e => e.note).join(', ')} (other medication, not counted). Your call: off day or 0.125.` }, ...(p.notes || [])];
+  }
+  return p;
+}
+// What the plan says for `date`, based only on days before it.
+function planCore(date) {
   const st = S.settings;
   if (!st.startDate) return null;
   if (date < st.startDate) return { kind: 'before', head: '—', text: `Plan starts ${fmt(st.startDate)}.` };
@@ -336,7 +347,7 @@ function renderToday() {
   ${backupDue ? `<div class="note warn">No backup in 7+ days. <a href="#" id="bk-now">Back up now</a></div>` : ''}
   <div class="card">
     <div class="label">Plan for today</div>
-    <div class="plan-dose">${p.head === 'Off' ? 'Off day' : p.head === '—' ? '—' : p.head + ' mg'}</div>
+    <div class="plan-dose">${p.head === 'Off' ? 'Off day' : p.head === '—' ? '—' : p.head.includes(' or ') ? p.head.replace(/^([\d.]+)/, '$1 mg') : p.head + ' mg'}</div>
     <div class="plan-text">${esc(p.text)}</div>
     ${(p.notes || []).map(noteHtml).join('')}
     ${doneNow ? `<div class="note ok">Logged today: ${mg(info.total)}</div>` : ''}
@@ -392,6 +403,7 @@ function liveWarn() {
   const el = $('#live-warn');
   if (!el) return;
   if (!(d > 0) || !form.date) { el.innerHTML = ''; return; }
+  if (form.reason === 'othermed') { el.innerHTML = noteHtml({ cls: 'info', t: 'Saved as a note. Not counted in the day total. Put the medication name in Note.' }); return; }
   el.innerHTML = checks(form.date, d, form.reason).map(t => noteHtml({ cls: 'bad', t })).join('');
 }
 function saveDose() {
@@ -400,6 +412,12 @@ function saveDose() {
   if (!(d > 0)) return alert('Pick a dose first.');
   if (!form.date) return alert('Pick a date.');
   if (form.date > ymd(new Date())) return alert('That date is in the future.');
+  if (form.reason === 'othermed') {
+    if (!form.note) return alert('Type the medication name in the Note field.');
+    addEntry({ date: form.date, dose: 0, reason: 'othermed', note: `${d} mg ${form.note}` });
+    form = { dose: null, reason: 'scheduled' };
+    return;
+  }
   const w = checks(form.date, d, form.reason);
   if (w.length && !confirm('Heads up:\n\n• ' + w.join('\n• ') + '\n\nSave anyway?')) return;
   addEntry({ date: form.date, dose: d, reason: form.reason, note: form.note || '' });
@@ -426,6 +444,7 @@ function firstLogged() { return S.entries.length ? S.entries[0].date : null; }
 function pillHtml(total, hasEntries, date) {
   const f = firstLogged();
   if (!hasEntries && (!f || date < f)) return `<span class="pill p-off">not logged</span>`;
+  if (hasEntries && total < EPS && dayInfo(date).entries.some(e => e.reason === 'othermed')) return `<span class="pill p-off">other</span>`;
   if (!hasEntries || total < EPS) return `<span class="pill p-off">${hasEntries ? 'off ✓' : 'off'}</span>`;
   const cls = total > 0.25 + EPS ? 'p-over' : total >= 0.25 - EPS ? 'p-high' : 'p-bridge';
   return `<span class="pill ${cls}">${+total.toFixed(4)}</span>`;
