@@ -96,6 +96,7 @@
 const KEY = 'doselog.v1';
 const EPS = 1e-6;
 const REASONS = {
+  backfill: 'Backfilled (reason not recorded)',
   scheduled: 'Scheduled bridge (0.125)',
   sos: 'Acute stress (SOS)',
   sleep: 'Sleep exception (acute stress keeping me up)',
@@ -350,7 +351,7 @@ function renderToday() {
       <label class="f">Amount (mg) <input id="custom" type="number" inputmode="decimal" step="0.0625" min="0" value="${esc(form.custom || '')}"></label>
     </div>
     <label class="f">Reason
-      <select id="reason">${Object.entries(REASONS).map(([k, v]) => `<option value="${k}" ${form.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <select id="reason">${Object.entries(REASONS).filter(([k]) => k !== 'backfill').map(([k, v]) => `<option value="${k}" ${form.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
       <input id="noslept" type="checkbox" style="width:22px;height:22px" ${form.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
     <label class="f">Date (before 6 AM counts as the previous day)
@@ -639,11 +640,38 @@ function restore(ev) {
   r.readAsText(f);
 }
 
+// ---------- import link (#import=<base64url JSON [[date, dose, reason, note], ...]>) ----------
+function importFromHash() {
+  const m = location.hash.match(/^#import=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  let rows;
+  try {
+    rows = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
+    if (!Array.isArray(rows) || !rows.every(r => /^\d{4}-\d{2}-\d{2}$/.test(r[0]) && r[1] >= 0)) throw new Error('bad data');
+  } catch (e) { alert('That import link is not valid.'); return; }
+  S = load(); // latest saved data, in case another tab or the installed app changed it
+  const dup = r => S.entries.some(e => e.date === r[0] && Math.abs(e.dose - r[1]) < EPS && (e.note || '') === (r[3] || ''));
+  const fresh = rows.filter(r => !dup(r));
+  if (!fresh.length) { alert('Those entries are already in your log.'); return; }
+  const list = fresh.map(r => `${r[0]}: ${r[1] > 0 ? r[1] + ' mg' : 'off'}`).join('\n');
+  if (!confirm(`Add ${fresh.length} entries to your log?\n\n${list}`)) return;
+  const now = new Date().toISOString();
+  fresh.forEach((r, i) => S.entries.push({ id: Date.now().toString(36) + i, at: now, date: r[0], dose: +r[1], reason: r[2] || 'other', note: r[3] || '' }));
+  S.entries.sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
+  save(); alert(`Added ${fresh.length} entries.`);
+}
+
 // ---------- boot ----------
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => { tab = b.dataset.tab; form = { dose: null, reason: 'scheduled' }; render(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+// Reload saved data whenever the app comes back to the front or another tab saves,
+// so a stale copy in memory never overwrites newer entries.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { S = load(); render(); } });
+window.addEventListener('storage', e => { if (e.key === KEY) { S = load(); render(); } });
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+importFromHash();
+window.addEventListener('hashchange', () => { importFromHash(); render(); });
 render();
 </script>
 </body>
