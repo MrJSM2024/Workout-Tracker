@@ -70,6 +70,7 @@
     justify-content: center; }
   .stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .stat:last-child { border-bottom: 0; }
+  .stat b { white-space: nowrap; padding-left: 8px; }
   .stat b.flag { color: var(--bad); }
   details summary { cursor: pointer; font-weight: 600; }
   .rules p, .rules li { font-size: 15px; }
@@ -105,13 +106,27 @@ const REASONS = {
 const INTERVAL_STEPS = [2, 3, 4, 7, 0]; // 0 = none
 const intervalName = n => n === 0 ? 'none (medication-free)' : n === 2 ? 'every other day' : n === 7 ? 'weekly' : `every ${n}${n === 3 ? 'rd' : 'th'} day`;
 
+const BRIDGE_START = '2026-09-30';
+function migrate(s) {
+  const st = s.settings;
+  if ((st.rulesVersion || 1) < 2) {
+    // Spec v2: bridge start is fixed at Sep 30, 2026; other plan dates derive from it.
+    if (st.startDate) {
+      st.startDate = BRIDGE_START;
+      st.intervals = (st.intervals || []).sort((a, b) => a.from.localeCompare(b.from));
+      if (st.intervals.length) st.intervals[0].from = BRIDGE_START; else st.intervals = [{ from: BRIDGE_START, every: 2 }];
+    }
+    delete st.widenEarliest; delete st.threeOffFrom;
+    st.rulesVersion = 2;
+  }
+  return s;
+}
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
-    if (s && Array.isArray(s.entries)) return s;
+    if (s && Array.isArray(s.entries)) return migrate(s);
   } catch (e) {}
-  return { entries: [], settings: { medName: 'My medicine', startDate: null,
-    widenEarliest: '2026-10-14', threeOffFrom: '2026-10-21', intervals: [], lastBackup: null } };
+  return { entries: [], settings: { medName: 'My medicine', startDate: null, intervals: [], lastBackup: null, rulesVersion: 2 } };
 }
 let S = load();
 function save() {
@@ -126,9 +141,12 @@ const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date
 const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
 const diffDays = (a, b) => Math.round((parse(b) - parse(a)) / 86400000); // b - a
 const fmt = s => parse(s).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-// "Until you've slept, it's still the same day": before 4 AM counts as the previous day.
-function logicalToday() { const d = new Date(); if (d.getHours() < 4) d.setDate(d.getDate() - 1); return ymd(d); }
+// Spec 1: a dose before 6 AM belongs to the previous day.
+const DAY_CUTOFF_HOUR = 6;
+function logicalToday() { const d = new Date(); if (d.getHours() < DAY_CUTOFF_HOUR) d.setDate(d.getDate() - 1); return ymd(d); }
 const mg = n => `${+n.toFixed(4)} mg`;
+const unlockSkip3 = () => addDays(S.settings.startDate, 21);
+const widenEarliest = () => addDays(S.settings.startDate, 14);
 
 // ---------- derived data ----------
 function dayInfo(date) {
@@ -137,7 +155,9 @@ function dayInfo(date) {
   return { entries: es, total, sleep: es.some(e => e.reason === 'sleep'),
     tremor: es.some(e => e.reason === 'tremor'), type: dayType(total) };
 }
-function dayType(t) { return t >= 0.25 - EPS ? 'high' : t > EPS ? 'bridge' : 'off'; }
+// Spec 1: off 0, bridge 0.125, high 0.25 to 0.375, very high above 0.375 (0.5 or more).
+function dayType(t) { return t > 0.375 + EPS ? 'vhigh' : t >= 0.25 - EPS ? 'high' : t > EPS ? 'bridge' : 'off'; }
+const isHigh = type => type === 'high' || type === 'vhigh';
 function intervalOn(date) {
   let every = 2;
   for (const iv of [...S.settings.intervals].sort((a, b) => a.from.localeCompare(b.from)))
@@ -152,9 +172,12 @@ function lastDosedBefore(date, maxBack = 120) {
   return null;
 }
 function highRunEnding(date) {
-  let len = 0, max = 0, d = date;
-  while (dayInfo(d).type === 'high') { len++; max = Math.max(max, dayInfo(d).total); d = addDays(d, -1); }
-  return { len, max };
+  let len = 0, vhigh = false, d = date;
+  while (isHigh(dayInfo(d).type)) { len++; vhigh = vhigh || dayInfo(d).type === 'vhigh'; d = addDays(d, -1); }
+  return { len, vhigh };
+}
+function tremorDaysIn(endDate, days) {
+  return new Set(S.entries.filter(e => e.reason === 'tremor' && e.dose > 0 && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date)).size;
 }
 
 // What the plan says for `date`, based only on days before it.
@@ -169,72 +192,97 @@ function planFor(date) {
   const last = dayInfo(L);
   const notes = [];
 
-  if (last.type === 'high') {
+  if (isHigh(last.type)) {
     const run = highRunEnding(L);
-    const base = run.max >= 0.5 - EPS ? 3 : 2;
-    const off = Math.max(base, every > 0 ? every - 1 : 0);
     if (gap === 1) {
-      if (run.len >= 3) notes.push({ cls: 'bad', t: 'No 4th day of 0.25. If the emergency is still going on, get medical advice.' });
+      if (run.len >= 3) notes.push({ cls: 'bad', t: 'No 4th high day in a row. If the emergency is still going on, get medical advice.' });
       else notes.push({ cls: 'info', t: `Only if the same acute stress continues: 0.25 again (would be day ${run.len + 1} of max 3). Otherwise off.` });
     }
-    if (run.len >= 3 && date >= st.threeOffFrom)
-      notes.push({ cls: 'info', t: 'After a 3-day run: 3 off days is OK if off days have felt fine.' });
-    if (base === 3 && gap <= off) notes.push({ cls: 'info', t: 'After a 0.5 day the plan is 3 off days, then 0.125.' });
+    // Spec 2: at interval "none", nothing follows a high day.
+    if (every === 0) return { kind: 'off', head: 'Off', text: `Interval is none. No 0.125 follows the ${mg(last.total)} day on ${fmt(L)}.`, notes };
+    const off = Math.max(run.vhigh ? 3 : 2, every - 1);
+    if (run.vhigh && gap <= off) notes.push({ cls: 'info', t: `After a very high day: ${off} off days, then 0.125.` });
+    if (run.len >= 3 && off === 2 && gap <= off + 1) {
+      if (date >= unlockSkip3() && tremorDaysIn(addDays(date, -1), 14) === 0)
+        notes.push({ cls: 'info', t: `Option unlocked: after a 3-day run you may skip 3 days instead of 2 (0.125 on ${fmt(addDays(L, 4))}).` });
+    }
     if (gap <= off) return { kind: 'off', head: 'Off', text: `Off day ${gap} of ${off} after ${mg(last.total)} on ${fmt(L)}. Next 0.125: ${fmt(addDays(L, off + 1))}.`, notes };
     return dueOrLate(addDays(L, off + 1), date, `Bridge 0.125 after the ${mg(last.total)} day.`, notes);
   }
 
-  // last dose was a 0.125 bridge
-  if (every === 0) return { kind: 'off', head: 'Off', text: 'Interval set to none. No scheduled doses.', notes };
+  // last dose was a 0.125 bridge (scheduled, late or tremor: all restart the count)
+  if (every === 0) return { kind: 'off', head: 'Off', text: 'Interval is none. No scheduled doses.', notes };
   const due = addDays(L, every);
   if (date < due) return { kind: 'off', head: 'Off', text: `Off day ${gap} of ${every - 1}. Next 0.125: ${fmt(due)} (${intervalName(every)}).`, notes };
   return dueOrLate(due, date, `Scheduled 0.125 (${intervalName(every)}).`, notes);
 }
 function dueOrLate(due, date, text, notes) {
   if (date === due) return { kind: 'due', head: '0.125', text, notes };
-  notes.push({ cls: 'warn', t: `Was due ${fmt(due)}. Take it when you remember. The count restarts from the day you take it. Never double up.` });
+  notes.push({ cls: 'warn', t: `Was due ${fmt(due)}. Take it once, today. The count restarts from today. Never double up.` });
   return { kind: 'due', head: '0.125', text: text + ' (late)', notes };
 }
 
-// Hard-limit checks for a date if `extra` dose with `reason` were added. Returns warnings (never blocks).
+function sleepDaysIn(endDate, days, extraDate) {
+  const n = new Set(S.entries.filter(e => e.reason === 'sleep' && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date));
+  if (extraDate) n.add(extraDate);
+  return n.size;
+}
+
+// Hard-limit checks (spec 5) for a date if `extra` dose with `reason` were added. Warns, never blocks.
 function checks(date, extra = 0, reason = null) {
   const cur = dayInfo(date);
   const total = cur.total + extra;
   const sleep = cur.sleep || reason === 'sleep';
   const type = dayType(total);
   const w = [];
-  if (total > 0.375 + EPS) {
-    if (Math.abs(total - 0.5) < EPS && sleep) {
-      w.push('A 0.5 day is not part of the plan. Plan: skip 3 days, then 0.125.');
-      const n = S.entries.length ? allDays().filter(d => d !== date && dayInfo(d).total >= 0.5 - EPS).length : 0;
-      if (n >= 1) w.push('WARNING SIGN: this would be more than one 0.5 day. Reassess the plan.');
-    } else w.push(`${mg(total)} is above the plan maximum (0.25/day, or 0.375 only with the sleep exception).`);
+  if (type === 'vhigh') {
+    w.push(`${mg(total)} is a very high day. Not part of the plan: ${Math.max(3, intervalOn(date) - 1)} off days follow, then 0.125.`);
+    const n = allDays().filter(d => d !== date && dayInfo(d).type === 'vhigh').length;
+    if (n >= 1) w.push('WARNING SIGN: more than one very high day. Reassess the plan.');
   } else if (total > 0.25 + EPS && !sleep) {
-    w.push('Over 0.25 in a day is only for the sleep exception (max 0.375).' +
-      (Math.abs(cur.total - 0.125) < EPS ? ' Hard day on a 0.125 day: add only 0.125 (total 0.25), not 0.25.' : ''));
+    w.push('Above 0.25 in a day is only for the sleep exception (extra 0.25 at night, max 0.375).' +
+      (Math.abs(cur.total - 0.125) < EPS ? ' Hard day on a 0.125 day: add only 0.125 (total 0.25).' : ''));
   }
   const prev = dayInfo(addDays(date, -1));
   if (type === 'bridge' && prev.type === 'bridge') w.push('Never 0.125 two days in a row.');
-  if (type === 'high') {
+  if (isHigh(type)) {
     let len = 1, d = addDays(date, -1);
-    while (dayInfo(d).type === 'high') { len++; d = addDays(d, -1); }
-    if (len >= 4) w.push('No 4th day of 0.25. If the emergency is still going on, get medical advice.');
+    while (isHigh(dayInfo(d).type)) { len++; d = addDays(d, -1); }
+    if (len >= 4) w.push('4th high day in a row. If the emergency is still going on, get medical advice.');
     if (extra > 0 && reason !== 'sos' && reason !== 'sleep' && !cur.entries.some(e => e.reason === 'sos' || e.reason === 'sleep'))
       w.push('0.25 is only for genuinely acute stress. Pick "Acute stress (SOS)" as the reason if that is what this is.');
   }
   if (sleep) {
     if (prev.sleep) w.push('Sleep exception: not two nights in a row.');
-    const month = date.slice(0, 7);
-    const n = new Set(S.entries.filter(e => e.reason === 'sleep' && e.date.startsWith(month)).map(e => e.date));
-    n.add(date);
-    if (n.size > 2) w.push(`Sleep exception used ${n.size} times this month. Max is twice a month.`);
+    const n = sleepDaysIn(date, 30, date);
+    if (n > 2) w.push(`Sleep exception used ${n} times in the last 30 days. Max is twice.`);
   }
+  if (reason === 'tremor' && extra > 0 && prev.total > EPS)
+    w.push('Tremor dose: not allowed when there was any dose yesterday.');
   if (type === 'bridge' && extra > 0 && cur.total < EPS) {
     const p = planFor(date);
     if (p && p.kind === 'off' && reason !== 'tremor' && reason !== 'sos')
       w.push('The plan says today is an off day.');
   }
   return w;
+}
+
+// Warning signs (spec 6).
+function warningSigns(today) {
+  const days = allDays();
+  const tremor30 = tremorDaysIn(today, 30);
+  const vhigh = days.filter(d => dayInfo(d).type === 'vhigh').length;
+  // 3+ high days within any 7 days that aren't one consecutive run. Report the latest window.
+  let cluster = null;
+  const highs = days.filter(d => isHigh(dayInfo(d).type));
+  for (let i = 0; i < highs.length; i++) {
+    const win = highs.filter(d => d <= highs[i] && diffDays(d, highs[i]) < 7);
+    if (win.length >= 3 && diffDays(win[0], win[win.length - 1]) !== win.length - 1) cluster = highs[i];
+  }
+  // High-day count per 28-day block ending today: rising two blocks in a row.
+  const block = k => days.filter(d => { const g = diffDays(d, today); return g >= 28 * k && g < 28 * (k + 1) && isHigh(dayInfo(d).type); }).length;
+  const blocks = [block(2), block(1), block(0)];
+  return { tremor30, vhigh, cluster, blocks, rising: blocks[0] < blocks[1] && blocks[1] < blocks[2] };
 }
 function allDays() { return [...new Set(S.entries.map(e => e.date))].sort(); }
 
@@ -256,11 +304,11 @@ function renderSetup() {
   $('#app').innerHTML = `
   <div class="card">
     <h2 style="margin-top:0">Set up</h2>
-    <p class="plan-text">Pick the day your plan starts. You can change it later in Settings.
+    <p class="plan-text">Bridge start date (from your plan). You can change it later in Settings.
     If you already took doses in the last few days, log them after setup (you can pick any date when logging) so the app knows where you are in the pattern.</p>
     <label class="f">Name shown at the top (kept only on this phone)
       <input id="su-name" value="${esc(S.settings.medName)}"></label>
-    <label class="f">Plan start date <input id="su-start" type="date" value="${logicalToday()}"></label>
+    <label class="f">Bridge start date <input id="su-start" type="date" value="${BRIDGE_START}"></label>
     <button class="primary" id="su-go">Start</button>
   </div>`;
   $('#su-go').onclick = () => {
@@ -303,7 +351,9 @@ function renderToday() {
     </div>
     <label class="f">Reason
       <select id="reason">${Object.entries(REASONS).map(([k, v]) => `<option value="${k}" ${form.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-    <label class="f">Date (before 4 AM counts as the previous day)
+    <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
+      <input id="noslept" type="checkbox" style="width:22px;height:22px" ${form.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
+    <label class="f">Date (before 6 AM counts as the previous day)
       <input id="date" type="date" value="${form.date}" max="${ymd(new Date())}"></label>
     <label class="f">Note (optional) <input id="note" value="${esc(form.note || '')}" placeholder="What happened?"></label>
     <div id="live-warn"></div>
@@ -319,6 +369,11 @@ function renderToday() {
     if (form.dose === 0.125 && form.reason === 'sos') form.reason = 'scheduled';
     renderToday();
   });
+  $('#noslept').onchange = () => {
+    syncForm(); form.noSleep = $('#noslept').checked;
+    form.date = form.noSleep ? addDays(ymd(new Date()), -1) : logicalToday();
+    renderToday();
+  };
   ['reason', 'date', 'note', 'custom'].forEach(id => { const el = $('#' + id); if (el) el.oninput = () => { syncForm(); liveWarn(); }; });
   $('#save').onclick = saveDose;
   if ($('#offok')) $('#offok').onclick = () => { addEntry({ date: today, dose: 0, reason: 'off', note: '' }); };
@@ -366,7 +421,10 @@ function bindDeletes() {
     S.entries = S.entries.filter(e => e.id !== b.dataset.del); save(); render();
   });
 }
-function pillHtml(total, hasEntries) {
+function firstLogged() { return S.entries.length ? S.entries[0].date : null; }
+function pillHtml(total, hasEntries, date) {
+  const f = firstLogged();
+  if (!hasEntries && (!f || date < f)) return `<span class="pill p-off">not logged</span>`;
   if (!hasEntries || total < EPS) return `<span class="pill p-off">${hasEntries ? 'off ✓' : 'off'}</span>`;
   const cls = total > 0.25 + EPS ? 'p-over' : total >= 0.25 - EPS ? 'p-high' : 'p-bridge';
   return `<span class="pill ${cls}">${+total.toFixed(4)}</span>`;
@@ -393,7 +451,7 @@ function renderHistory() {
       <p class="entry" style="margin-bottom:0"><span class="pill p-bridge">0.125</span> <span class="pill p-high">0.25</span> <span class="pill p-over">&gt;0.25</span></p></div>
     <div class="card">${days.map(d => {
       const i = dayInfo(d);
-      return `<div class="hist-day"><div><b>${fmt(d)}</b>${i.entries.map(entryHtml).join('')}</div>${pillHtml(i.total, i.entries.length > 0)}</div>`;
+      return `<div class="hist-day"><div><b>${fmt(d)}</b>${i.entries.map(entryHtml).join('')}</div>${pillHtml(i.total, i.entries.length > 0, d)}</div>`;
     }).join('') || '<p class="plan-text">Nothing logged yet.</p>'}</div>`;
   bindDeletes();
 }
@@ -401,45 +459,46 @@ function renderHistory() {
 function renderTrends() {
   const today = logicalToday();
   const st = S.settings;
-  const thisM = today.slice(0, 7);
-  const lastM = ymd(new Date(parse(today).getFullYear(), parse(today).getMonth() - 1, 15)).slice(0, 7);
   const days = allDays();
-  const highIn = m => days.filter(d => d.startsWith(m) && dayInfo(d).type === 'high').length;
-  const hThis = highIn(thisM), hLast = highIn(lastM);
-  const sleepThis = new Set(S.entries.filter(e => e.reason === 'sleep' && e.date.startsWith(thisM)).map(e => e.date)).size;
-  const halfDays = days.filter(d => dayInfo(d).total >= 0.5 - EPS).length;
-  const tremor30 = new Set(S.entries.filter(e => e.reason === 'tremor' && diffDays(e.date, today) < 30).map(e => e.date)).size;
-  const lastHigh = [...days].reverse().find(d => dayInfo(d).type === 'high');
+  const ws = warningSigns(today);
+  const sleep30 = sleepDaysIn(today, 30);
+  const lastHigh = [...days].reverse().find(d => isHigh(dayInfo(d).type));
   const every = intervalOn(today);
   const ivs = [...st.intervals].sort((a, b) => a.from.localeCompare(b.from));
   const curFrom = ivs.length ? ivs[ivs.length - 1].from : st.startDate;
   const held = diffDays(curFrom, today);
   const next = INTERVAL_STEPS[INTERVAL_STEPS.indexOf(every) + 1];
-  const canWiden = next !== undefined && today >= st.widenEarliest && held >= 14;
+  const tremor14 = tremorDaysIn(today, 14);
+  const widenWarn = [];
+  if (today < widenEarliest()) widenWarn.push(`Earliest first widening is ${fmt(widenEarliest())}.`);
+  if (held < 14) widenWarn.push(`Only ${held} days at the current step (needs 14).`);
+  if (tremor14 > 0) widenWarn.push(`${tremor14} tremor dose${tremor14 > 1 ? 's' : ''} in the last 14 days.`);
   const stat = (k, v, flag) => `<div class="stat"><span>${k}</span><b class="${flag ? 'flag' : ''}">${v}</b></div>`;
 
   $('#app').innerHTML = `
   <div class="card"><div class="label">Warning signs</div>
-    ${stat('0.25 days this month', hThis, hThis > hLast && hThis > 0)}
-    ${stat('0.25 days last month', hLast)}
-    ${stat('Sleep exceptions this month (max 2)', sleepThis, sleepThis > 2)}
-    ${stat('0.5 days, all time (more than 1 is a warning sign)', halfDays, halfDays > 1)}
-    ${stat('Tremor/tingling doses, last 30 days', tremor30, tremor30 >= 3)}
-    ${stat('Days since last 0.25', lastHigh ? diffDays(lastHigh, today) : 'none logged')}
-    <div class="note info">Red = check against your plan's warning signs. Also reassess if 0.25 stops feeling sufficient or you want more.</div>
+    ${stat('Tremor doses, last 30 days (flag at 2)', ws.tremor30, ws.tremor30 >= 2)}
+    ${stat('Very high days, all time (flag above 1)', ws.vhigh, ws.vhigh > 1)}
+    ${stat('3+ high days in 7 days, not one run', ws.cluster ? 'yes, ' + fmt(ws.cluster) : 'no', !!ws.cluster)}
+    ${stat('High days per 28-day block (oldest → now)', ws.blocks.join(' → '), ws.rising)}
+    ${stat('Sleep exceptions, last 30 days (max 2)', sleep30, sleep30 > 2)}
+    ${stat('Days since last high day', lastHigh ? diffDays(lastHigh, today) : 'none logged')}
+    <div class="note info">Red = a warning sign from your plan. Also reassess if 0.25 stops feeling sufficient or you want more.</div>
   </div>
   <div class="card"><div class="label">Widening</div>
     ${stat('Current interval', intervalName(every))}
     ${stat('Held since', `${fmt(curFrom)} (${held} days)`)}
-    ${stat('Earliest widening date', fmt(st.widenEarliest))}
-    ${next === undefined ? '' : canWiden
-      ? `<div class="note ok">Eligible: held 14+ days. Widen only if off days have felt fine for 2 weeks.</div>
-         <button class="primary" id="widen">Move to ${intervalName(next)}</button>`
-      : `<div class="note info">Next step: ${intervalName(next)}. Needs at least 14 days at the current step${today < st.widenEarliest ? ` and not before ${fmt(st.widenEarliest)}` : ''}.</div>`}
+    ${stat('Earliest first widening', fmt(widenEarliest()))}
+    ${stat('"Skip 3" option after a 3-day run from', fmt(unlockSkip3()))}
+    ${next === undefined ? '' : `
+      ${widenWarn.length ? widenWarn.map(t => noteHtml({ cls: 'warn', t })).join('') : noteHtml({ cls: 'ok', t: 'No widening warnings.' })}
+      <button class="primary" id="widen">Move to ${intervalName(next)}</button>`}
     ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="margin-top:10px">Undo last interval change</button>` : ''}
   </div>`;
   if ($('#widen')) $('#widen').onclick = () => {
-    if (!confirm(`Have off days felt fine for the last 2 weeks?\n\nMove to ${intervalName(next)} starting today?`)) return;
+    const msg = (widenWarn.length ? 'Heads up:\n\n• ' + widenWarn.join('\n• ') + '\n\n' : '') + `Move to ${intervalName(next)} starting today?`;
+    if (!confirm(msg)) return;
+    S.settings.intervals = S.settings.intervals.filter(i => i.from !== today);
     S.settings.intervals.push({ from: today, every: next }); save(); render();
   };
   if ($('#undo-widen')) $('#undo-widen').onclick = () => {
@@ -464,27 +523,25 @@ function renderSettings() {
   </div>
   <div class="card"><div class="label">Plan settings</div>
     <label class="f">Name at the top <input id="s-name" value="${esc(st.medName)}"></label>
-    <label class="f">Plan start date <input id="s-start" type="date" value="${st.startDate}"></label>
-    <label class="f">Earliest widening date <input id="s-widen" type="date" value="${st.widenEarliest}"></label>
-    <label class="f">3 off days after a 3-day run OK from <input id="s-three" type="date" value="${st.threeOffFrom}"></label>
+    <label class="f">Bridge start date <input id="s-start" type="date" value="${st.startDate}"></label>
+    <p class="entry">Earliest first widening: ${fmt(widenEarliest())} (start + 14). "Skip 3" option: from ${fmt(unlockSkip3())} (start + 21).</p>
     <label class="f">Current interval
       <select id="s-int">${INTERVAL_STEPS.map(n => `<option value="${n}" ${intervalOn(logicalToday()) === n ? 'selected' : ''}>${intervalName(n)}</option>`).join('')}</select></label>
     <button class="primary" id="s-save">Save settings</button>
   </div>
   <div class="card rules"><details><summary>Plan rules (reference)</summary>
-    <p><b>Key idea:</b> 0.25 = SOS / acute. 0.125 = low-dose bridge. 0 = medication-free day.</p>
     <ul>
-      <li><b>Normal:</b> 0.125 → 0 → 0.125 → 0 → 0.125</li>
-      <li><b>Hard day:</b> 0.25 → 0 → 0 → 0.125</li>
-      <li><b>Hard 2 days:</b> 0.25 → 0.25 → 0 → 0 → 0.125</li>
-      <li><b>Hard 3 days, same emergency:</b> 0.25 ×3 → 0 → 0 → 0.125. No 4th day of 0.25; if still going on day 4, get medical advice. From the date set above, 3 off-days after a 3-day run is OK if off days felt fine.</li>
-      <li><b>Hard day during the 2 off-days:</b> the new 0.25 restarts the count.</li>
-      <li><b>Hard day on a 0.125 day:</b> take 0.25 instead, not both. Already took 0.125? Add 0.125 (total 0.25).</li>
-      <li><b>Can't sleep (acute stress):</b> no dose yet → 0.25. Took 0.125 → 0.25 at night (total 0.375). Took 0.25 → not part of the plan; if it happens (0.5), skip 3 days then 0.125. Until you've slept, it's the same day. Not two nights in a row. Max twice a month.</li>
-      <li><b>Missed 0.125:</b> take it when you remember, same day or next. Every other day from that dose. Never double up.</li>
-      <li><b>Tremor/tingling/twitching on an off day, no trigger:</b> 0.125, unless you took one yesterday. Log it.</li>
-      <li><b>Widening:</b> every other day → every 3rd → every 4th → weekly → none. Hold each step at least 2 weeks. Hard day on a wider interval: 0.25, then next 0.125 after 2 days or the current interval, whichever is longer.</li>
-      <li><b>Hard limits:</b> never &gt;0.25/day except sleep exception (max 0.375). Never 0.125 two days in a row. 0.25 only for genuinely acute stress. Log every dose, date, reason.</li>
+      <li><b>A day:</b> a dose before 6 AM, or marked "haven't slept yet", belongs to the previous day. Day total: 0 off, 0.125 bridge, 0.25 to 0.375 high, 0.5+ very high.</li>
+      <li><b>After a bridge day:</b> next 0.125 after the current interval.</li>
+      <li><b>After a high day or run:</b> off days = larger of 2 or (interval − 1), then 0.125. After a very high day: larger of 3 or (interval − 1).</li>
+      <li><b>After a 3-day high run:</b> default 2 off days. "Skip 3" is an option from start + 21 days with no tremor dose in the last 14 days.</li>
+      <li><b>Interval none:</b> no scheduled 0.125; nothing follows a high day.</li>
+      <li><b>A new high day during off days</b> restarts the count.</li>
+      <li><b>Late 0.125:</b> take it once, the day it's remembered. Count restarts from that day.</li>
+      <li><b>Tremor dose:</b> allowed unless there was any dose yesterday. Restarts the count like a normal 0.125.</li>
+      <li><b>Intervals:</b> 2 → 3 → 4 → 7 → none, by button only. Earliest first widening start + 14. Warn if under 14 days at the step or any tremor dose in the last 14 days. High days never change the interval.</li>
+      <li><b>Hard limits:</b> above 0.25/day (except 0.375 with the extra 0.25 at night for sleep). 0.125 two days in a row. 4th high day in a row. Sleep exception two nights in a row or more than twice in 30 days.</li>
+      <li><b>Warning signs:</b> 2+ tremor doses in 30 days. More than one very high day. 3+ high days in 7 days not in one run. High days rising two 28-day blocks in a row.</li>
     </ul></details></div>
   <div class="card"><button class="secondary" id="wipe" style="color:var(--bad)">Erase all data on this phone</button></div>`;
 
@@ -494,15 +551,14 @@ function renderSettings() {
   $('#restore').onclick = () => $('#file').click();
   $('#file').onchange = restore;
   $('#s-save').onclick = () => {
-    const start = $('#s-start').value, widen = $('#s-widen').value, three = $('#s-three').value;
-    if (!start || !widen || !three) return alert('All dates are required.');
+    const start = $('#s-start').value;
+    if (!start) return alert('Bridge start date is required.');
     st.medName = $('#s-name').value.trim() || 'My medicine';
     if (start !== st.startDate) {
       st.intervals = st.intervals.filter(i => i.from > start);
       st.intervals.unshift({ from: start, every: 2 });
       st.startDate = start;
     }
-    st.widenEarliest = widen; st.threeOffFrom = three;
     const every = +$('#s-int').value, today = logicalToday();
     if (every !== intervalOn(today)) {
       const from = today < start ? start : today;
@@ -552,7 +608,8 @@ function logText() {
     const i = dayInfo(d);
     const es = i.entries.filter(e => e.dose > 0).map(e =>
       `${e.dose} ${REASONS[e.reason] || e.reason}${e.note ? ' "' + e.note + '"' : ''} @${new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
-    lines.push(`${d} | ${+i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : 'off')}`);
+    const none = !i.entries.length && (!firstLogged() || d < firstLogged());
+    lines.push(`${d} | ${none ? '-' : +i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : none ? 'not logged' : 'off')}`);
   }
   return lines.join('\n');
 }
@@ -576,7 +633,7 @@ function restore(ev) {
       const data = j.data || j;
       if (!Array.isArray(data.entries) || !data.settings) throw new Error('Not a Dose Log backup file.');
       if (!confirm(`Replace what's on this phone with the backup from ${j.exportedAt ? fmt(j.exportedAt.slice(0, 10)) : 'file'} (${data.entries.length} entries)?`)) return;
-      S = data; save(); tab = 'today'; render(); alert('Restored.');
+      S = migrate(data); save(); tab = 'today'; render(); alert('Restored.');
     } catch (e) { alert('Could not restore: ' + e.message); }
   };
   r.readAsText(f);
