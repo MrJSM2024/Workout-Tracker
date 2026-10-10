@@ -13,12 +13,14 @@
     --bg: #f6f7f5; --card: #ffffff; --text: #1b1f1c; --muted: #66706a; --line: #e2e6e3;
     --accent: #166534; --accent-soft: #dcfce7; --warn: #b45309; --warn-soft: #fef3c7;
     --bad: #b91c1c; --bad-soft: #fee2e2; --sos: #7c3aed; --sos-soft: #ede9fe;
+    --c-bridge: #16a34a; --c-high: #7c3aed; --grid: #e2e6e3;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0f1311; --card: #181d1a; --text: #e8ece9; --muted: #98a39c; --line: #2a312d;
       --accent: #4ade80; --accent-soft: #143322; --warn: #fbbf24; --warn-soft: #3a2c0b;
       --bad: #f87171; --bad-soft: #3b1414; --sos: #a78bfa; --sos-soft: #261c42;
+      --c-bridge: #16a34a; --c-high: #8b5cf6; --grid: #2a312d;
     }
   }
   * { box-sizing: border-box; }
@@ -75,6 +77,18 @@
   details summary { cursor: pointer; font-weight: 600; }
   .rules p, .rules li { font-size: 15px; }
   .hidden { display: none; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart text { fill: var(--muted); font-size: 10px; }
+  .chart .val { fill: var(--text); font-weight: 700; }
+  .chart .hit { fill: transparent; cursor: pointer; }
+  .chart .bg { fill: transparent; }
+  .chart .bg.on { fill: var(--grid); opacity: .6; }
+  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin: 6px 0 4px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .readout { font-size: 14px; min-height: 20px; margin-top: 6px; }
+  table.wk { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  table.wk th, table.wk td { text-align: right; padding: 4px 2px; border-bottom: 1px solid var(--line); }
+  table.wk th:first-child, table.wk td:first-child { text-align: left; }
 </style>
 </head>
 <body>
@@ -478,6 +492,64 @@ function renderHistory() {
   bindDeletes();
 }
 
+// ---------- weekly chart ----------
+const mondayOf = d => addDays(d, -((parse(d).getDay() + 6) % 7));
+function weeklyData(today, maxWeeks = 12) {
+  const f = firstLogged();
+  if (!f) return [];
+  const weeks = [];
+  for (let w = mondayOf(f); w <= today; w = addDays(w, 7)) {
+    let bridge = 0, high = 0, dosed = 0, logged = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(w, i);
+      if (d > today || d < f) continue;
+      logged++;
+      const info = dayInfo(d);
+      if (info.total > EPS) dosed++;
+      if (info.type === 'bridge') bridge += info.total; else if (isHigh(info.type)) high += info.total;
+    }
+    weeks.push({ start: w, bridge, high, total: bridge + high, dosed, logged, partial: addDays(w, 6) > today || w < f });
+  }
+  return weeks.slice(-maxWeeks);
+}
+const short = d => parse(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const num = n => String(+n.toFixed(3));
+function weeklyChartHtml(weeks) {
+  if (!weeks.length) return '<p class="plan-text">Log a few days to see the chart.</p>';
+  const W = 340, H = 190, L = 30, Rt = 6, T = 16, B = 22, ph = H - T - B, pw = W - L - Rt;
+  const max = Math.max(...weeks.map(w => w.total), 0.25);
+  const step = max <= 1 ? 0.25 : max <= 2 ? 0.5 : 1;
+  const top = Math.ceil(max / step) * step;
+  const y = v => T + ph - (v / top) * ph;
+  const slot = pw / weeks.length, bw = Math.min(24, slot * 0.6);
+  const path = (x, yTop, h, round) => {
+    if (h <= 0) return '';
+    const r = round ? Math.min(4, h, bw / 2) : 0, b = yTop + h;
+    return `M${x},${b}V${yTop + r}${r ? `Q${x},${yTop} ${x + r},${yTop}` : ''}H${x + bw - r}${r ? `Q${x + bw},${yTop} ${x + bw},${yTop + r}` : ''}V${b}Z`;
+  };
+  let g = '';
+  for (let v = 0; v <= top + EPS; v += step)
+    g += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${num(v)}</text>`;
+  const maxIdx = weeks.reduce((m, w, i) => w.total > weeks[m].total ? i : m, 0);
+  weeks.forEach((w, i) => {
+    const x = L + slot * i + (slot - bw) / 2;
+    const hb = (w.bridge / top) * ph, hh = (w.high / top) * ph;
+    const gap = hb > 0 && hh > 0 ? 2 : 0;
+    g += `<rect class="bg" data-bg="${i}" x="${L + slot * i + 2}" y="${T}" width="${slot - 4}" height="${ph}" rx="4"/>`;
+    g += `<path d="${path(x, y(w.bridge), hb, hh === 0)}" fill="var(--c-bridge)"/>`;
+    g += `<path d="${path(x, y(w.bridge) - gap - hh, hh, true)}" fill="var(--c-high)"/>`;
+    if ((i === weeks.length - 1 || i === maxIdx) && w.total > 0)
+      g += `<text class="val" x="${x + bw / 2}" y="${y(w.total) - (gap ? 2 : 0) - 4}" text-anchor="middle">${num(w.total)}</text>`;
+    if (weeks.length <= 6 || i % Math.ceil(weeks.length / 6) === 0 || i === weeks.length - 1)
+      g += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${short(w.start)}</text>`;
+    g += `<rect class="hit" data-wk="${i}" x="${L + slot * i}" y="${T}" width="${slot}" height="${ph}" rx="4"/>`;
+  });
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Milligrams per week, last ${weeks.length} weeks">${g}</svg></div>`;
+}
+function weekReadout(w) {
+  return `<b>Week of ${short(w.start)}${w.partial ? ' (partial)' : ''}:</b> ${num(w.total)} mg total · ${num(w.bridge)} bridge · ${num(w.high)} high · ${w.dosed} of ${w.logged} days dosed`;
+}
+
 function renderTrends() {
   const today = logicalToday();
   const st = S.settings;
@@ -497,7 +569,18 @@ function renderTrends() {
   if (tremor14 > 0) widenWarn.push(`${tremor14} tremor dose${tremor14 > 1 ? 's' : ''} in the last 14 days.`);
   const stat = (k, v, flag) => `<div class="stat"><span>${k}</span><b class="${flag ? 'flag' : ''}">${v}</b></div>`;
 
+  const weeks = weeklyData(today);
   $('#app').innerHTML = `
+  <div class="card"><div class="label">Milligrams per week (Mon to Sun)</div>
+    <div class="legend"><span><i style="background:var(--c-bridge)"></i>Bridge days (0.125)</span><span><i style="background:var(--c-high)"></i>High days (0.25+)</span></div>
+    ${weeklyChartHtml(weeks)}
+    <div class="readout" id="wk-readout">${weeks.length ? weekReadout(weeks[weeks.length - 1]) : ''}</div>
+    <p class="entry" style="margin:4px 0 0">Tap a bar for details. Other-medication notes are not counted.</p>
+    ${weeks.length ? `<details style="margin-top:8px"><summary>Show table</summary><table class="wk">
+      <tr><th>Week of</th><th>Total</th><th>Bridge</th><th>High</th><th>Days dosed</th></tr>
+      ${weeks.slice().reverse().map(w => `<tr><td>${short(w.start)}${w.partial ? '*' : ''}</td><td>${num(w.total)}</td><td>${num(w.bridge)}</td><td>${num(w.high)}</td><td>${w.dosed}/${w.logged}</td></tr>`).join('')}
+    </table><p class="entry">* partial week</p></details>` : ''}
+  </div>
   <div class="card"><div class="label">Warning signs</div>
     ${stat('Tremor doses, last 30 days (flag at 2)', ws.tremor30, ws.tremor30 >= 2)}
     ${stat('Very high days, all time (flag above 1)', ws.vhigh, ws.vhigh > 1)}
@@ -517,6 +600,10 @@ function renderTrends() {
       <button class="primary" id="widen">Move to ${intervalName(next)}</button>`}
     ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="margin-top:10px">Undo last interval change</button>` : ''}
   </div>`;
+  document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
+    document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));
+    $('#wk-readout').innerHTML = weekReadout(weeks[+h.dataset.wk]);
+  });
   if ($('#widen')) $('#widen').onclick = () => {
     const msg = (widenWarn.length ? 'Heads up:\n\n• ' + widenWarn.join('\n• ') + '\n\n' : '') + `Move to ${intervalName(next)} starting today?`;
     if (!confirm(msg)) return;
@@ -649,6 +736,8 @@ function logText() {
     `3+ high days in 7 days, not one run: ${ws.cluster ? 'yes, latest ' + ws.cluster : 'no'}`,
     `High days per 28-day block, oldest to now: ${ws.blocks.join(', ')}${ws.rising ? ' (rising, flagged)' : ''}`,
     `Sleep exceptions, last 30 days: ${sleepDaysIn(today, 30)} (max 2)`);
+  lines.push('', 'WEEKLY TOTALS (Mon to Sun, mg)');
+  weeklyData(today, 520).forEach(w => lines.push(`Week of ${w.start}${w.partial ? ' (partial)' : ''}: ${num(w.total)} total (bridge ${num(w.bridge)}, high ${num(w.high)}), ${w.dosed}/${w.logged} days dosed`));
   return lines.join('\n');
 }
 async function copyLog() {

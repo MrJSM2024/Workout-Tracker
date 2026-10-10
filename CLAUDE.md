@@ -41,4 +41,6 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   in a row, 4th high day in a row, sleep exception two nights in a row or more than 2 in rolling 30 days.
 - Warning signs: 2+ tremor doses in rolling 30 days; more than one very high day; 3+ high days within
   7 days that aren't one consecutive run; high days rising across three consecutive 28-day blocks.
+- Trends tab: weekly mg stacked bar chart (Mon to Sun, bridge vs high, last 12 weeks) with tap readout
+  and table; weekly totals are also appended to the copied log.
 - Bridge start: Sep 30, 2026 (settings.startDate). Old v1 data is migrated in `migrate()`.
