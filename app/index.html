@@ -66,7 +66,7 @@
   .p-high { background: var(--sos-soft); color: var(--sos); }
   .p-over { background: var(--bad-soft); color: var(--bad); }
   .entry { font-size: 13px; color: var(--muted); }
-  .entry button { border: 0; background: none; color: var(--bad); font-size: 13px; padding: 2px 4px; }
+  .entry button { border: 0; background: none; color: var(--bad); font-size: 13px; padding: 8px 6px; margin: -6px 0; }
   .strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
   .strip div { aspect-ratio: 1; border-radius: 6px; font-size: 11px; display: flex; align-items: center;
     justify-content: center; }
@@ -77,6 +77,19 @@
   details summary { cursor: pointer; font-weight: 600; }
   .rules p, .rules li { font-size: 15px; }
   .hidden { display: none; }
+  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(64px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto;
+    background: var(--text); color: var(--bg); border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between;
+    align-items: center; gap: 10px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.2); z-index: 10; }
+  #toast.hidden { display: none; }
+  #toast button { border: 0; background: none; color: var(--bg); font: inherit; font-weight: 800; text-decoration: underline; padding: 4px; }
+  .feel { flex: 1; min-height: 46px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-weight: 600; }
+  .feel.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .quick { display: flex; gap: 10px; margin-top: 14px; }
+  .quick .primary, .quick .secondary { margin-top: 0; flex: 1; min-height: 54px; }
+  details.more > summary { color: var(--muted); font-weight: 600; font-size: 14px; margin-top: 12px; }
+  details.logform > summary { font-weight: 700; list-style: none; display: flex; justify-content: space-between; }
+  details.logform > summary::after { content: '▾'; color: var(--muted); }
+  details.logform[open] > summary::after { content: '▴'; }
   .chart svg { width: 100%; height: auto; display: block; }
   .chart text { fill: var(--muted); font-size: 10px; }
   .chart .val { fill: var(--text); font-weight: 700; }
@@ -97,6 +110,7 @@
   <small id="todayLabel"></small>
 </header>
 <main id="app"></main>
+<div id="toast" class="hidden"></div>
 <nav>
   <button data-tab="today" class="on">Today</button>
   <button data-tab="history">History</button>
@@ -119,6 +133,7 @@ const REASONS = {
   othermed: 'Other medication (not counted in totals)',
   other: 'Other',
 };
+const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
 const INTERVAL_STEPS = [2, 3, 4, 7, 0]; // 0 = none
 const intervalName = n => n === 0 ? 'none (medication-free)' : n === 2 ? 'every other day' : n === 7 ? 'weekly' : `every ${n}${n === 3 ? 'rd' : 'th'} day`;
 
@@ -135,6 +150,7 @@ function migrate(s) {
     delete st.widenEarliest; delete st.threeOffFrom;
     st.rulesVersion = 2;
   }
+  if (!s.checkins || typeof s.checkins !== 'object') s.checkins = {};
   return s;
 }
 function load() {
@@ -142,7 +158,7 @@ function load() {
     const s = JSON.parse(localStorage.getItem(KEY));
     if (s && Array.isArray(s.entries)) return migrate(s);
   } catch (e) {}
-  return { entries: [], settings: { medName: 'My medicine', startDate: null, intervals: [], lastBackup: null, rulesVersion: 2 } };
+  return { entries: [], checkins: {}, settings: { medName: 'My medicine', startDate: null, intervals: [], lastBackup: null, rulesVersion: 2 } };
 }
 let S = load();
 function save() {
@@ -349,45 +365,70 @@ function renderSetup() {
 
 function noteHtml(n) { return `<div class="note ${n.cls}">${esc(n.t)}</div>`; }
 
+function planHeadHtml(p) {
+  return p.head === 'Off' ? 'Off day' : p.head === '—' ? '—' : p.head.includes(' or ') ? p.head.replace(/^([\d.]+)/, '$1 mg') : p.head + ' mg';
+}
 function renderToday() {
   const today = logicalToday();
   const p = planFor(today);
   const info = dayInfo(today);
   const backupDue = S.entries.length && (!S.settings.lastBackup || diffDays(S.settings.lastBackup.slice(0, 10), today) >= 7);
-  const doneNow = info.total > EPS;
   if (form.date === undefined) form.date = today;
+  const feel = S.checkins[today];
+  // One-tap actions for what the plan expects, shown until something is logged today.
+  let quick = '';
+  if (!info.entries.length && p.kind === 'due')
+    quick = `<div class="quick"><button class="primary" id="q-take">I took 0.125</button>${p.head.includes(' or ') ? '<button class="secondary" id="q-off">Off today</button>' : ''}</div>`;
+  else if (!info.entries.length && p.kind === 'off')
+    quick = `<div class="quick"><button class="primary" id="q-off">Confirm off day</button></div>`;
+  const formOpen = form.open || form.dose != null;
+  const moreOpen = form.noSleep || form.date !== today;
 
   $('#app').innerHTML = `
   ${backupDue ? `<div class="note warn">No backup in 7+ days. <a href="#" id="bk-now">Back up now</a></div>` : ''}
   <div class="card">
     <div class="label">Plan for today</div>
-    <div class="plan-dose">${p.head === 'Off' ? 'Off day' : p.head === '—' ? '—' : p.head.includes(' or ') ? p.head.replace(/^([\d.]+)/, '$1 mg') : p.head + ' mg'}</div>
+    <div class="plan-dose">${planHeadHtml(p)}</div>
     <div class="plan-text">${esc(p.text)}</div>
     ${(p.notes || []).map(noteHtml).join('')}
-    ${doneNow ? `<div class="note ok">Logged today: ${mg(info.total)}</div>` : ''}
+    ${info.entries.length ? `<div class="note ok">Logged today: ${info.total > EPS ? mg(info.total) : info.entries.some(e => e.reason === 'othermed') ? 'note only' : 'off day'}</div>` : ''}
+    ${quick}
   </div>
   <div class="card">
-    <div class="label">Log a dose</div>
-    <div class="row" style="margin-top:8px">
-      ${[0.125, 0.25].map(d => `<button class="dose-btn ${form.dose === d ? 'sel' : ''}" data-dose="${d}">${d}</button>`).join('')}
-      <button class="dose-btn ${form.dose === 'custom' ? 'sel' : ''}" data-dose="custom">Other</button>
-    </div>
-    <div id="custom-wrap" class="${form.dose === 'custom' ? '' : 'hidden'}">
-      <label class="f">Amount (mg) <input id="custom" type="number" inputmode="decimal" step="0.0625" min="0" value="${esc(form.custom || '')}"></label>
-    </div>
-    <label class="f">Reason
-      <select id="reason">${Object.entries(REASONS).filter(([k]) => k !== 'backfill').map(([k, v]) => `<option value="${k}" ${form.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-    <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
-      <input id="noslept" type="checkbox" style="width:22px;height:22px" ${form.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
-    <label class="f">Date (before 6 AM counts as the previous day)
-      <input id="date" type="date" value="${form.date}" max="${ymd(new Date())}"></label>
-    <label class="f">Note (optional) <input id="note" value="${esc(form.note || '')}" placeholder="What happened?"></label>
-    <div id="live-warn"></div>
-    <button class="primary" id="save">Save</button>
+    <div class="label">How do you feel today?</div>
+    <div class="row" style="margin-top:8px">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${feel === k ? 'sel' : ''}" data-feel="${k}">${v}</button>`).join('')}</div>
   </div>
-  ${doneNow ? '' : `<div class="card"><button class="secondary" id="offok" style="width:100%">Mark today as off day (no dose)</button></div>`}
+  <div class="card">
+    <details class="logform" id="logform" ${formOpen ? 'open' : ''}>
+      <summary><span>${quick ? 'Log something different' : 'Log a dose'}<br><span class="entry" style="font-weight:400">SOS, late, tremor, other medication</span></span></summary>
+      <div class="row" style="margin-top:12px">
+        ${[0.125, 0.25].map(d => `<button class="dose-btn ${form.dose === d ? 'sel' : ''}" data-dose="${d}">${d}</button>`).join('')}
+        <button class="dose-btn ${form.dose === 'custom' ? 'sel' : ''}" data-dose="custom">Other amount</button>
+      </div>
+      <div id="custom-wrap" class="${form.dose === 'custom' ? '' : 'hidden'}">
+        <label class="f">Amount (mg) <input id="custom" type="number" inputmode="decimal" step="0.0625" min="0" value="${esc(form.custom || '')}"></label>
+      </div>
+      <label class="f">Reason
+        <select id="reason">${Object.entries(REASONS).filter(([k]) => k !== 'backfill').map(([k, v]) => `<option value="${k}" ${form.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label class="f">Note (optional) <input id="note" value="${esc(form.note || '')}" placeholder="What happened?"></label>
+      <details class="more" ${moreOpen ? 'open' : ''}><summary>Different day, or haven't slept yet?</summary>
+        <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
+          <input id="noslept" type="checkbox" style="width:22px;height:22px" ${form.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
+        <label class="f">Date (before 6 AM counts as the previous day)
+          <input id="date" type="date" value="${form.date}" max="${ymd(new Date())}"></label>
+      </details>
+      <div id="live-warn"></div>
+      <button class="primary" id="save">Save</button>
+    </details>
+  </div>
   ${info.entries.length ? `<div class="card"><div class="label">Today's entries</div>${info.entries.map(entryHtml).join('')}</div>` : ''}`;
 
+  $('#logform').ontoggle = () => { form.open = $('#logform').open; };
+  document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => {
+    const k = b.dataset.feel;
+    if (S.checkins[today] === k) delete S.checkins[today]; else S.checkins[today] = k;
+    save(); renderToday();
+  });
   document.querySelectorAll('[data-dose]').forEach(b => b.onclick = () => {
     syncForm();
     const v = b.dataset.dose; form.dose = v === 'custom' ? 'custom' : +v;
@@ -402,11 +443,31 @@ function renderToday() {
   };
   ['reason', 'date', 'note', 'custom'].forEach(id => { const el = $('#' + id); if (el) el.oninput = () => { syncForm(); liveWarn(); }; });
   $('#save').onclick = saveDose;
-  if ($('#offok')) $('#offok').onclick = () => { addEntry({ date: today, dose: 0, reason: 'off', note: '' }); };
+  if ($('#q-take')) $('#q-take').onclick = () => {
+    const reason = p.text.includes('(late)') ? 'late' : 'scheduled';
+    const w = checks(today, 0.125, reason);
+    if (w.length && !confirm('Heads up:\n\n• ' + w.join('\n• ') + '\n\nSave anyway?')) return;
+    const id = addEntry({ date: today, dose: 0.125, reason, note: '' });
+    showToast('Saved: 0.125 mg today', () => removeEntry(id));
+  };
+  if ($('#q-off')) $('#q-off').onclick = () => {
+    const id = addEntry({ date: today, dose: 0, reason: 'off', note: '' });
+    showToast('Saved: off day', () => removeEntry(id));
+  };
   if ($('#bk-now')) $('#bk-now').onclick = e => { e.preventDefault(); backup(); };
   bindDeletes();
   liveWarn();
 }
+let toastTimer = null;
+function showToast(text, undo) {
+  const t = $('#toast');
+  t.innerHTML = `<span>${esc(text)}</span>${undo ? '<button id="t-undo">Undo</button>' : ''}`;
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
+  if (undo) $('#t-undo').onclick = () => { undo(); t.classList.add('hidden'); };
+}
+function removeEntry(id) { S.entries = S.entries.filter(e => e.id !== id); save(); render(); }
 function syncForm() {
   form.reason = $('#reason').value; form.date = $('#date').value; form.note = $('#note').value;
   if ($('#custom')) form.custom = $('#custom').value;
@@ -428,24 +489,31 @@ function saveDose() {
   if (form.date > ymd(new Date())) return alert('That date is in the future.');
   if (form.reason === 'othermed') {
     if (!form.note) return alert('Type the medication name in the Note field.');
-    addEntry({ date: form.date, dose: 0, reason: 'othermed', note: `${d} mg ${form.note}` });
+    const id = addEntry({ date: form.date, dose: 0, reason: 'othermed', note: `${d} mg ${form.note}` });
     form = { dose: null, reason: 'scheduled' };
+    showToast(`Saved note: ${d} mg ${S.entries.find(e => e.id === id).note.replace(/^[\d.]+ mg /, '')}`, () => removeEntry(id));
     return;
   }
   const w = checks(form.date, d, form.reason);
   if (w.length && !confirm('Heads up:\n\n• ' + w.join('\n• ') + '\n\nSave anyway?')) return;
-  addEntry({ date: form.date, dose: d, reason: form.reason, note: form.note || '' });
+  const date = form.date;
+  const id = addEntry({ date, dose: d, reason: form.reason, note: form.note || '' });
   form = { dose: null, reason: 'scheduled' };
+  showToast(`Saved: ${mg(d)}${date !== logicalToday() ? ' on ' + fmt(date) : ' today'}`, () => removeEntry(id));
 }
 function addEntry(e) {
-  S.entries.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString(), ...e });
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  S.entries.push({ id, at: new Date().toISOString(), ...e });
   S.entries.sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
   save(); render();
+  return id;
 }
 function entryHtml(e) {
-  const t = new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const what = e.dose > 0 ? `${mg(e.dose)} · ${esc(REASONS[e.reason] || e.reason)}${e.note ? ' · ' + esc(e.note) : ''}` : e.note ? `Note: ${esc(e.note)}` : 'Off day confirmed';
-  return `<div class="entry">${what} · logged ${t}
+  const dt = new Date(e.at);
+  const t = e.reason === 'backfill' || isNaN(dt) ? '' : ' · ' + dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const reason = e.reason === 'backfill' ? 'backfilled' : REASONS[e.reason] || e.reason;
+  const what = e.dose > 0 ? `${mg(e.dose)} · ${esc(reason)}${e.note ? ' · ' + esc(e.note) : ''}` : e.note ? `Note: ${esc(e.note)}` : 'Off day confirmed';
+  return `<div class="entry">${what}${t}
     <button data-del="${e.id}">delete</button></div>`;
 }
 function bindDeletes() {
@@ -486,7 +554,7 @@ function renderHistory() {
       <p class="entry" style="margin-bottom:0"><span class="pill p-bridge">0.125</span> <span class="pill p-high">0.25</span> <span class="pill p-over">&gt;0.25</span></p></div>
     <div class="card">${days.map(d => {
       const i = dayInfo(d);
-      return `<div class="hist-day"><div><b>${fmt(d)}</b>${i.entries.map(entryHtml).join('')}</div>${pillHtml(i.total, i.entries.length > 0, d)}</div>`;
+      return `<div class="hist-day"><div><b>${fmt(d)}</b>${S.checkins[d] ? ` <span class="entry">· felt ${FEELINGS[S.checkins[d]].toLowerCase()}</span>` : ''}${i.entries.map(entryHtml).join('')}</div>${pillHtml(i.total, i.entries.length > 0, d)}</div>`;
     }).join('') || '<p class="plan-text">Nothing logged yet.</p>'}</div>`;
   $('#copy-hist').onclick = copyLog;
   bindDeletes();
@@ -563,6 +631,8 @@ function renderTrends() {
   const held = diffDays(curFrom, today);
   const next = INTERVAL_STEPS[INTERVAL_STEPS.indexOf(every) + 1];
   const tremor14 = tremorDaysIn(today, 14);
+  const feel14 = { ok: 0, some: 0, rough: 0 };
+  for (let i = 0; i < 14; i++) { const f = S.checkins[addDays(today, -i)]; if (f) feel14[f]++; }
   const widenWarn = [];
   if (today < widenEarliest()) widenWarn.push(`Earliest first widening is ${fmt(widenEarliest())}.`);
   if (held < 14) widenWarn.push(`Only ${held} days at the current step (needs 14).`);
@@ -595,9 +665,10 @@ function renderTrends() {
     ${stat('Held since', `${fmt(curFrom)} (${held} days)`)}
     ${stat('Earliest first widening', fmt(widenEarliest()))}
     ${stat('"Skip 3" option after a 3-day run from', fmt(unlockSkip3()))}
+    ${stat('How you felt, last 14 days', `${feel14.ok} OK · ${feel14.some} some · ${feel14.rough} rough`)}
     ${next === undefined ? '' : `
       ${widenWarn.length ? widenWarn.map(t => noteHtml({ cls: 'warn', t })).join('') : noteHtml({ cls: 'ok', t: 'No widening warnings.' })}
-      <button class="primary" id="widen">Move to ${intervalName(next)}</button>`}
+      <button class="${widenWarn.length ? 'secondary' : 'primary'}" id="widen" style="width:100%;margin-top:12px">Move to ${intervalName(next)}</button>`}
     ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="margin-top:10px">Undo last interval change</button>` : ''}
   </div>`;
   document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
@@ -620,7 +691,7 @@ function renderSettings() {
   const st = S.settings;
   $('#app').innerHTML = `
   <div class="card"><div class="label">Backup</div>
-    <p class="plan-text">Your log lives only on this phone. Back up weekly: tap Back up, then pick Google Drive (or email it to yourself).
+    <p class="plan-text">Your log lives only on this phone. Back up weekly: tap <b>Back up</b>, pick <b>Drive</b>, then tap <b>Save</b> on the Drive screen.
     Last backup: <b>${st.lastBackup ? fmt(st.lastBackup.slice(0, 10)) : 'never'}</b></p>
     <div class="row">
       <button class="secondary" id="bk">Back up</button>
@@ -727,7 +798,7 @@ function logText() {
     const es = i.entries.filter(e => e.dose > 0 || e.note).map(e => e.dose === 0 ? `note: "${e.note}"` :
       `${e.dose} ${REASONS[e.reason] || e.reason}${e.note ? ' "' + e.note + '"' : ''}${e.reason === 'backfill' ? '' : ' @' + new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
     const none = !i.entries.length && (!firstLogged() || d < firstLogged());
-    lines.push(`${d} | ${none ? '-' : +i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : none ? 'not logged' : 'off')}`);
+    lines.push(`${d} | ${none ? '-' : +i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : none ? 'not logged' : 'off')}${S.checkins[d] ? ' | felt: ' + FEELINGS[S.checkins[d]] : ''}`);
   }
   const ws = warningSigns(today);
   lines.push('', 'WARNING SIGNS (per plan)',

@@ -24,6 +24,12 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
 - Repo is public: keep the medication name and any personal data OUT of the code.
   The display name is typed into the app and stored locally.
 
+## UI notes
+- Today: one-tap "I took 0.125" / "Confirm off day" from the plan card, undo toast after every save,
+  daily "How do you feel" check-in (stored in `S.checkins[date]`: ok / some / rough), and a collapsed
+  "Log something different" form for SOS, late, tremor and other-medication entries.
+- Check-ins appear in History, the copied log, and the Widening card (last 14 days).
+
 ## Rules logic (spec v2, from the owner's plan thread; in `planFor()`, `checks()`, `warningSigns()`)
 - Day: a dose before 6 AM, or marked "haven't slept yet", belongs to the previous day.
 - Day types by total: off 0, bridge 0.125, high 0.25 to 0.375, very high above 0.375.
