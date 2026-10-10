@@ -10,112 +10,228 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root {
-    --bg: #f6f7f5; --card: #ffffff; --text: #1b1f1c; --muted: #66706a; --line: #e2e6e3;
-    --accent: #166534; --accent-soft: #dcfce7; --warn: #b45309; --warn-soft: #fef3c7;
-    --bad: #b91c1c; --bad-soft: #fee2e2; --sos: #7c3aed; --sos-soft: #ede9fe;
-    --c-bridge: #16a34a; --c-high: #7c3aed; --grid: #e2e6e3;
+    --bg: #f3f2ee; --card: #ffffff; --raised: #f8f7f4; --text: #18201b; --muted: #6b736d; --faint: #9aa19c; --line: #e7e6e1;
+    --accent: #1f7a4d; --accent-strong: #145a37; --accent-soft: #e3f1e8; --on-accent: #ffffff;
+    --warn: #9a5b06; --warn-soft: #fbf0dc; --bad: #b42318; --bad-soft: #fde7e4; --sos: #6d3fd9; --sos-soft: #efe9fd;
+    --c-bridge: #16a34a; --c-high: #7c3aed; --grid: #e7e6e1;
+    --shadow: 0 1px 2px rgba(24,32,27,.05), 0 6px 20px rgba(24,32,27,.06);
+    --hero-dose: linear-gradient(150deg, #1f7a4d 0%, #145a37 100%);
+    --hero-off: linear-gradient(150deg, #ffffff 0%, #f1f4f1 100%);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0f1311; --card: #181d1a; --text: #e8ece9; --muted: #98a39c; --line: #2a312d;
-      --accent: #4ade80; --accent-soft: #143322; --warn: #fbbf24; --warn-soft: #3a2c0b;
-      --bad: #f87171; --bad-soft: #3b1414; --sos: #a78bfa; --sos-soft: #261c42;
-      --c-bridge: #16a34a; --c-high: #8b5cf6; --grid: #2a312d;
+      --bg: #0d110f; --card: #161b18; --raised: #1c221e; --text: #e9eeea; --muted: #9aa59e; --faint: #6c766f; --line: #252c27;
+      --accent: #4cc38a; --accent-strong: #2f9e68; --accent-soft: #15301f; --on-accent: #062012;
+      --warn: #f2b53c; --warn-soft: #33270b; --bad: #f38b80; --bad-soft: #3a1714; --sos: #a78bfa; --sos-soft: #251c40;
+      --c-bridge: #16a34a; --c-high: #8b5cf6; --grid: #252c27;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+      --hero-dose: linear-gradient(150deg, #1d6b45 0%, #10432a 100%);
+      --hero-off: linear-gradient(150deg, #1a201c 0%, #151a17 100%);
     }
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { padding: 14px 16px 6px; display: flex; justify-content: space-between; align-items: baseline; }
-  header h1 { font-size: 20px; margin: 0; }
-  header small { color: var(--muted); }
-  main { padding: 0 16px 96px; max-width: 560px; margin: 0 auto; }
-  nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: var(--card);
-    border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
-  nav button { flex: 1; padding: 14px 4px; border: 0; background: none; color: var(--muted);
-    font-size: 14px; font-weight: 600; }
-  nav button.on { color: var(--accent); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 12px 0; }
-  .plan-dose { font-size: 40px; font-weight: 800; margin: 2px 0; }
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; cursor: pointer; }
+  header { max-width: 560px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 20px 4px; }
+  header .eyebrow { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+  header h1 { font-size: 30px; line-height: 1.15; margin: 2px 0 0; letter-spacing: -.02em; }
+  main { padding: 0 16px calc(104px + env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; }
+
+  nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 4px;
+    background: color-mix(in srgb, var(--card) 88%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line); padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); z-index: 5; }
+  nav button { flex: 1; max-width: 120px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 4px;
+    border: 0; background: none; color: var(--faint); font-size: 12px; font-weight: 600; border-radius: 14px; }
+  nav button svg { width: 24px; height: 24px; padding: 2px 14px; box-sizing: content-box; border-radius: 999px; }
+  nav button.on { color: var(--text); }
+  nav button.on svg { background: var(--accent-soft); color: var(--accent); }
+
+  .card { background: var(--card); border-radius: 20px; padding: 18px; margin: 14px 0; box-shadow: var(--shadow); }
+  .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+  .card-title { font-size: 17px; font-weight: 700; margin: 0 0 2px; }
   .plan-text { color: var(--muted); }
-  .label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .dose-btn { flex: 1 1 30%; min-height: 64px; border-radius: 12px; border: 2px solid var(--line);
-    background: var(--card); color: var(--text); font-size: 20px; font-weight: 700; }
+  .entry { font-size: 13px; color: var(--muted); }
+  .entry button { border: 0; background: none; color: var(--bad); font-size: 13px; padding: 8px 6px; margin: -6px 0; }
+  .hidden { display: none !important; }
+
+  /* hero */
+  .hero { border-radius: 26px; padding: 22px 20px 18px; margin: 14px 0; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+  .hero.dose { background: var(--hero-dose); color: #fff; }
+  .hero.off, .hero.done { background: var(--hero-off); color: var(--text); }
+  .hero .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; opacity: .75; }
+  .hero h2 { font-size: 40px; line-height: 1.05; margin: 6px 0 6px; letter-spacing: -.03em; font-weight: 800; }
+  .hero h2 small { font-size: 22px; font-weight: 700; letter-spacing: -.01em; opacity: .85; }
+  .hero .sub { font-size: 15px; opacity: .85; }
+  .hero .chip { display: block; margin-top: 10px; padding: 9px 12px; border-radius: 12px; font-size: 14px; }
+  .hero.dose .chip { background: rgba(255,255,255,.14); color: #fff; }
+  .hero.off .chip, .hero.done .chip { background: var(--raised); color: var(--muted); }
+  .hero .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .hero .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .hero .chip.ok { background: var(--accent-soft); color: var(--accent); }
+  .hero .done-badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 12px 6px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px; }
+  .hero.dose .done-badge { background: rgba(255,255,255,.18); color: #fff; }
+  .quick { display: flex; gap: 10px; margin-top: 16px; }
+  .btn-hero { flex: 1; min-height: 54px; border-radius: 16px; border: 0; font-size: 17px; font-weight: 800; }
+  .hero.dose .btn-hero { background: #fff; color: #145a37; }
+  .hero.dose .btn-hero.ghost { background: rgba(255,255,255,.14); color: #fff; }
+  .hero.off .btn-hero, .hero.done .btn-hero { background: var(--accent); color: var(--on-accent); }
+
+  /* 7-day timeline */
+  .timeline { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(127,127,127,.18); }
+  .tl { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; }
+  .tl .wd { opacity: .6; }
+  .tl .dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+  .tl .d-bridge { background: var(--c-bridge); color: #fff; }
+  .tl .d-high { background: var(--c-high); color: #fff; }
+  .hero.dose .tl .d-bridge, .hero.dose .tl .d-high { box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
+  .tl .d-off { background: transparent; }
+  .tl .d-off::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .35; }
+  .tl .d-plan { border: 2px dashed currentColor; opacity: .75; }
+  .tl .d-none { opacity: .3; }
+  .tl.today .dn { padding: 1px 7px; border-radius: 999px; background: currentColor; }
+  .hero.dose .tl.today .dn { background: #fff; color: #145a37; }
+  .hero.off .tl.today .dn, .hero.done .tl.today .dn { background: var(--text); color: var(--card); }
+  .tl-legend { display: flex; justify-content: center; gap: 14px; margin-top: 10px; font-size: 11px; opacity: .7; }
+  .tl-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+
+  /* feeling segmented control */
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .feel { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 14px;
+    border: 2px solid transparent; background: var(--raised); color: var(--muted); font-size: 13px; font-weight: 700; }
+  .feel svg { width: 28px; height: 28px; }
+  .feel.sel { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .feel.sel.rough { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+
+  /* forms */
+  .dose-btn { flex: 1 1 28%; min-height: 60px; border-radius: 14px; border: 2px solid transparent; background: var(--raised);
+    color: var(--text); font-size: 19px; font-weight: 800; }
+  .dose-btn small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
   .dose-btn.sel { border-color: var(--accent); background: var(--accent-soft); }
-  select, input, textarea { width: 100%; font: inherit; padding: 10px 12px; border-radius: 10px;
-    border: 1px solid var(--line); background: var(--bg); color: var(--text); }
-  label.f { display: block; margin-top: 12px; font-size: 14px; color: var(--muted); }
-  .primary { width: 100%; margin-top: 16px; min-height: 54px; border: 0; border-radius: 12px;
-    background: var(--accent); color: #fff; font-size: 18px; font-weight: 700; }
-  @media (prefers-color-scheme: dark) { .primary { color: #052e16; } }
-  .secondary { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line);
-    background: var(--card); color: var(--text); font: inherit; font-weight: 600; }
-  .note { padding: 10px 12px; border-radius: 10px; margin-top: 10px; font-size: 15px; }
+  select, input, textarea { width: 100%; font: inherit; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line);
+    background: var(--raised); color: var(--text); outline: none; }
+  select:focus, input:focus { border-color: var(--accent); }
+  label.f { display: block; margin-top: 14px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  label.f input, label.f select { margin-top: 6px; }
+  .primary { width: 100%; margin-top: 16px; min-height: 54px; border: 0; border-radius: 16px; background: var(--accent);
+    color: var(--on-accent); font-size: 17px; font-weight: 800; }
+  .secondary { padding: 12px 16px; border-radius: 14px; border: 0; background: var(--raised); color: var(--text); font-weight: 700; }
+  details.logform > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  details.logform > summary::-webkit-details-marker { display: none; }
+  details.logform > summary .chev { width: 32px; height: 32px; border-radius: 50%; background: var(--raised); display: flex;
+    align-items: center; justify-content: center; transition: transform .2s; color: var(--muted); flex: none; }
+  details.logform[open] > summary .chev { transform: rotate(180deg); }
+  details.more > summary { color: var(--muted); font-weight: 600; font-size: 14px; margin-top: 14px; }
+  details summary { cursor: pointer; }
+
+  .note { padding: 10px 12px; border-radius: 12px; margin-top: 10px; font-size: 14px; }
   .note.warn { background: var(--warn-soft); color: var(--warn); }
   .note.bad { background: var(--bad-soft); color: var(--bad); }
   .note.ok { background: var(--accent-soft); color: var(--accent); }
-  .note.info { background: var(--bg); color: var(--muted); }
-  .hist-day { display: flex; justify-content: space-between; align-items: center; padding: 10px 0;
-    border-bottom: 1px solid var(--line); gap: 8px; }
-  .hist-day:last-child { border-bottom: 0; }
-  .pill { display: inline-block; min-width: 64px; text-align: center; padding: 4px 8px; border-radius: 999px;
-    font-weight: 700; font-size: 14px; }
-  .p-off { background: var(--bg); color: var(--muted); }
+  .note.info { background: var(--raised); color: var(--muted); }
+  .banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 16px;
+    background: var(--warn-soft); color: var(--warn); font-size: 14px; font-weight: 600; margin-top: 10px; }
+  .banner button { border: 0; background: var(--warn); color: var(--card); border-radius: 10px; padding: 8px 12px; font-weight: 800; font-size: 13px; }
+
+  /* toast */
+  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto;
+    background: var(--text); color: var(--card); border-radius: 16px; padding: 14px 16px; display: flex; justify-content: space-between;
+    align-items: center; gap: 10px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; }
+  #toast.hidden { display: none; }
+  #toast button { border: 0; background: none; color: var(--accent-soft); font-weight: 800; padding: 4px; text-decoration: underline; }
+
+  /* history */
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 12px; }
+  .cal .h { font-size: 11px; color: var(--faint); text-align: center; font-weight: 700; }
+  .cal .c { aspect-ratio: 1; border-radius: 10px; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    background: var(--raised); color: var(--faint); position: relative; }
+  .cal .c.bridge { background: var(--c-bridge); color: #fff; }
+  .cal .c.high { background: var(--c-high); color: #fff; }
+  .cal .c.over { background: var(--bad); color: #fff; }
+  .cal .c.today { outline: 2px solid var(--text); outline-offset: 1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .wk-head { display: flex; justify-content: space-between; align-items: baseline; margin: 22px 4px 6px; }
+  .wk-head b { font-size: 15px; }
+  .wk-head span { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .day-row { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .day-row:last-child { border-bottom: 0; }
+  .day-num { width: 42px; text-align: center; flex: none; }
+  .day-num b { display: block; font-size: 20px; line-height: 1; }
+  .day-num span { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+  .day-body { flex: 1; min-width: 0; }
+  .pill { display: inline-block; min-width: 58px; text-align: center; padding: 5px 9px; border-radius: 999px; font-weight: 800; font-size: 13px; flex: none; }
+  .p-off { background: var(--raised); color: var(--faint); }
   .p-bridge { background: var(--accent-soft); color: var(--accent); }
   .p-high { background: var(--sos-soft); color: var(--sos); }
   .p-over { background: var(--bad-soft); color: var(--bad); }
-  .entry { font-size: 13px; color: var(--muted); }
-  .entry button { border: 0; background: none; color: var(--bad); font-size: 13px; padding: 8px 6px; margin: -6px 0; }
-  .strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
-  .strip div { aspect-ratio: 1; border-radius: 6px; font-size: 11px; display: flex; align-items: center;
-    justify-content: center; }
-  .stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .feel-tag { display: table; margin-bottom: 3px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--raised); color: var(--muted); margin-left: 6px; }
+  .feel-tag.rough { background: var(--warn-soft); color: var(--warn); }
+
+  /* trends */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .kpi { background: var(--card); border-radius: 18px; padding: 14px 12px; box-shadow: var(--shadow); }
+  .kpi b { display: block; font-size: 22px; line-height: 1.15; letter-spacing: -.02em; white-space: nowrap; }
+  .kpi b small { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .kpi span { display: block; margin-top: 2px; }
+  .kpi span { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .sign { display: flex; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .sign:last-child { border-bottom: 0; }
+  .sign .ic { width: 26px; height: 26px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; }
+  .sign .ic.okc { background: var(--accent-soft); color: var(--accent); }
+  .sign .ic.flagc { background: var(--bad-soft); color: var(--bad); }
+  .sign .t { flex: 1; font-size: 14px; }
+  .sign .t small { display: block; color: var(--muted); font-size: 12px; }
+  .sign .v { font-weight: 800; white-space: nowrap; }
+  .sign .v.flag { color: var(--bad); }
+  .steps { display: flex; gap: 6px; margin: 12px 0 4px; }
+  .steps div { flex: 1; text-align: center; padding: 8px 2px; border-radius: 12px; background: var(--raised); color: var(--faint); font-size: 12px; font-weight: 800; }
+  .steps div.done { background: var(--accent-soft); color: var(--accent); }
+  .steps div.cur { background: var(--accent); color: var(--on-accent); }
+  .bar { height: 10px; border-radius: 999px; background: var(--raised); overflow: hidden; margin: 8px 0 4px; }
+  .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .stat { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
   .stat:last-child { border-bottom: 0; }
   .stat b { white-space: nowrap; padding-left: 8px; }
-  .stat b.flag { color: var(--bad); }
-  details summary { cursor: pointer; font-weight: 600; }
-  .rules p, .rules li { font-size: 15px; }
-  .hidden { display: none; }
-  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(64px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto;
-    background: var(--text); color: var(--bg); border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between;
-    align-items: center; gap: 10px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.2); z-index: 10; }
-  #toast.hidden { display: none; }
-  #toast button { border: 0; background: none; color: var(--bg); font: inherit; font-weight: 800; text-decoration: underline; padding: 4px; }
-  .feel { flex: 1; min-height: 46px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-weight: 600; }
-  .feel.sel { border-color: var(--accent); background: var(--accent-soft); }
-  .quick { display: flex; gap: 10px; margin-top: 14px; }
-  .quick .primary, .quick .secondary { margin-top: 0; flex: 1; min-height: 54px; }
-  details.more > summary { color: var(--muted); font-weight: 600; font-size: 14px; margin-top: 12px; }
-  details.logform > summary { font-weight: 700; list-style: none; display: flex; justify-content: space-between; }
-  details.logform > summary::after { content: '▾'; color: var(--muted); }
-  details.logform[open] > summary::after { content: '▴'; }
   .chart svg { width: 100%; height: auto; display: block; }
   .chart text { fill: var(--muted); font-size: 10px; }
   .chart .val { fill: var(--text); font-weight: 700; }
   .chart .hit { fill: transparent; cursor: pointer; }
   .chart .bg { fill: transparent; }
   .chart .bg.on { fill: var(--grid); opacity: .6; }
-  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin: 6px 0 4px; }
-  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
-  .readout { font-size: 14px; min-height: 20px; margin-top: 6px; }
+  .readout { font-size: 14px; min-height: 20px; margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--raised); }
   table.wk { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-  table.wk th, table.wk td { text-align: right; padding: 4px 2px; border-bottom: 1px solid var(--line); }
+  table.wk th, table.wk td { text-align: right; padding: 6px 2px; border-bottom: 1px solid var(--line); }
   table.wk th:first-child, table.wk td:first-child { text-align: left; }
+
+  /* settings */
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .tile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; border-radius: 16px; border: 0;
+    background: var(--raised); color: var(--text); font-weight: 700; font-size: 15px; text-align: left; }
+  .tile svg { width: 22px; height: 22px; color: var(--accent); }
+  .tile small { font-weight: 500; color: var(--muted); font-size: 12px; }
+  .tile.main { grid-column: span 2; flex-direction: row; align-items: center; background: var(--accent); color: var(--on-accent); }
+  .tile.main svg, .tile.main small { color: var(--on-accent); opacity: .9; }
+  .rules p, .rules li { font-size: 14px; }
+  .rules li { margin-bottom: 6px; }
+  .danger { width: 100%; padding: 14px; border-radius: 16px; border: 1.5px solid var(--bad-soft); background: none; color: var(--bad); font-weight: 700; }
+  .version { text-align: center; font-size: 12px; color: var(--faint); margin: 18px 0 6px; }
 </style>
 </head>
 <body>
 <header>
-  <h1 id="title">Dose Log</h1>
-  <small id="todayLabel"></small>
+  <div class="eyebrow" id="eyebrow"></div>
+  <h1 id="title">Today</h1>
 </header>
 <main id="app"></main>
 <div id="toast" class="hidden"></div>
 <nav>
-  <button data-tab="today" class="on">Today</button>
-  <button data-tab="history">History</button>
-  <button data-tab="trends">Trends</button>
-  <button data-tab="settings">Settings</button>
+  <button data-tab="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/></svg>Today</button>
+  <button data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>History</button>
+  <button data-tab="trends"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Trends</button>
+  <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
 </nav>
 
 <script>
@@ -134,6 +250,20 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
+const APP_VERSION = '2026-10-10';
+const FACE = {
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01" stroke-width="3"/></svg>',
+  some: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><path d="M9 9h.01M15 9h.01" stroke-width="3"/></svg>',
+  rough: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><path d="M9 9h.01M15 9h.01" stroke-width="3"/></svg>',
+};
+const ICON = {
+  backup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/><path d="M12 12v9M8 16l4-4 4 4"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  csv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>',
+  restore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+  chev: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+};
 const INTERVAL_STEPS = [2, 3, 4, 7, 0]; // 0 = none
 const intervalName = n => n === 0 ? 'none (medication-free)' : n === 2 ? 'every other day' : n === 7 ? 'weekly' : `every ${n}${n === 3 ? 'rd' : 'th'} day`;
 
@@ -335,8 +465,8 @@ let tab = 'today';
 let form = { dose: null, reason: 'scheduled' };
 
 function render() {
-  $('#title').textContent = S.settings.medName || 'Dose Log';
-  $('#todayLabel').textContent = fmt(logicalToday());
+  $('#title').textContent = { today: 'Today', history: 'History', trends: 'Trends', settings: 'Settings' }[tab];
+  $('#eyebrow').textContent = `${S.settings.medName || 'Dose Log'} · ${fmt(logicalToday())}`;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   if (!S.settings.startDate) return renderSetup();
   ({ today: renderToday, history: renderHistory, trends: renderTrends, settings: renderSettings })[tab]();
@@ -345,7 +475,7 @@ function render() {
 function renderSetup() {
   $('#app').innerHTML = `
   <div class="card">
-    <h2 style="margin-top:0">Set up</h2>
+    <div class="card-title" style="font-size:22px">Welcome</div>
     <p class="plan-text">Bridge start date (from your plan). You can change it later in Settings.
     If you already took doses in the last few days, log them after setup (you can pick any date when logging) so the app knows where you are in the pattern.</p>
     <label class="f">Name shown at the top (kept only on this phone)
@@ -365,8 +495,36 @@ function renderSetup() {
 
 function noteHtml(n) { return `<div class="note ${n.cls}">${esc(n.t)}</div>`; }
 
-function planHeadHtml(p) {
-  return p.head === 'Off' ? 'Off day' : p.head === '—' ? '—' : p.head.includes(' or ') ? p.head.replace(/^([\d.]+)/, '$1 mg') : p.head + ' mg';
+// What the next days look like if the plan is followed (simulated, nothing saved).
+function projection(from, days) {
+  const saved = S.entries; S.entries = saved.slice();
+  const out = {};
+  try {
+    for (let i = 0; i < days; i++) {
+      const d = addDays(from, i);
+      if (dayInfo(d).entries.length) continue;
+      const p = planFor(d);
+      if (p && p.kind === 'due') { out[d] = 0.125; S.entries.push({ id: 'proj' + i, at: '', date: d, dose: 0.125, reason: 'scheduled', note: '' }); }
+      else out[d] = 0;
+    }
+  } finally { S.entries = saved; }
+  return out;
+}
+function timelineHtml(today) {
+  const proj = projection(today, 4), f = firstLogged();
+  let h = '<div class="timeline">';
+  for (let i = -3; i <= 3; i++) {
+    const d = addDays(today, i), info = dayInfo(d);
+    let cls, txt = '';
+    if (info.entries.length || (i < 0 && f && d >= f)) {
+      cls = isHigh(info.type) ? 'd-high' : info.type === 'bridge' ? 'd-bridge' : 'd-off';
+
+    } else if (d in proj) cls = proj[d] ? 'd-plan' : 'd-off';
+    else cls = 'd-none d-off';
+    const wd = parse(d).toLocaleDateString(undefined, { weekday: 'narrow' });
+    h += `<div class="tl ${i === 0 ? 'today' : ''}"><span class="wd">${wd}</span><div class="dot ${cls}">${txt}</div><span class="dn"><span>${parse(d).getDate()}</span></span></div>`;
+  }
+  return h + `</div><div class="tl-legend"><span><i style="background:var(--c-bridge)"></i>0.125</span><span><i style="background:var(--c-high)"></i>0.25+</span><span><i style="border:1.5px dashed currentColor"></i>planned</span></div>`;
 }
 function renderToday() {
   const today = logicalToday();
@@ -375,35 +533,44 @@ function renderToday() {
   const backupDue = S.entries.length && (!S.settings.lastBackup || diffDays(S.settings.lastBackup.slice(0, 10), today) >= 7);
   if (form.date === undefined) form.date = today;
   const feel = S.checkins[today];
-  // One-tap actions for what the plan expects, shown until something is logged today.
-  let quick = '';
-  if (!info.entries.length && p.kind === 'due')
-    quick = `<div class="quick"><button class="primary" id="q-take">I took 0.125</button>${p.head.includes(' or ') ? '<button class="secondary" id="q-off">Off today</button>' : ''}</div>`;
-  else if (!info.entries.length && p.kind === 'off')
-    quick = `<div class="quick"><button class="primary" id="q-off">Confirm off day</button></div>`;
+  const logged = info.entries.length > 0;
+  const choice = p.head.includes(' or ');
+  const heroCls = logged ? 'done' : p.kind === 'due' ? 'dose' : 'off';
+  let title, quick = '';
+  if (logged) title = info.total > EPS ? `${num(info.total)} <small>mg logged</small>` : 'Off day';
+  else if (p.kind === 'due') title = choice ? '0.125 <small>or off</small>' : `0.125 <small>mg today</small>`;
+  else if (p.kind === 'off') title = 'Off day';
+  else title = '—';
+  if (!logged && p.kind === 'due')
+    quick = `<div class="quick"><button class="btn-hero" id="q-take">I took 0.125</button>${choice ? '<button class="btn-hero ghost" id="q-off">Off today</button>' : ''}</div>`;
+  else if (!logged && p.kind === 'off')
+    quick = `<div class="quick"><button class="btn-hero" id="q-off">Confirm off day</button></div>`;
   const formOpen = form.open || form.dose != null;
   const moreOpen = form.noSleep || form.date !== today;
 
   $('#app').innerHTML = `
-  ${backupDue ? `<div class="note warn">No backup in 7+ days. <a href="#" id="bk-now">Back up now</a></div>` : ''}
-  <div class="card">
-    <div class="label">Plan for today</div>
-    <div class="plan-dose">${planHeadHtml(p)}</div>
-    <div class="plan-text">${esc(p.text)}</div>
-    ${(p.notes || []).map(noteHtml).join('')}
-    ${info.entries.length ? `<div class="note ok">Logged today: ${info.total > EPS ? mg(info.total) : info.entries.some(e => e.reason === 'othermed') ? 'note only' : 'off day'}</div>` : ''}
+  ${backupDue ? `<div class="banner"><span>No backup in 7+ days</span><button id="bk-now">Back up</button></div>` : ''}
+  <section class="hero ${heroCls}">
+    <div class="eyebrow">${logged ? 'Logged today' : 'Plan for today'}</div>
+    <h2>${title}</h2>
+    <div class="sub">${esc(p.text)}</div>
+    ${(p.notes || []).map(n => `<div class="chip ${n.cls === 'info' ? '' : n.cls}">${esc(n.t)}</div>`).join('')}
+    ${logged ? `<div class="done-badge">${ICON.check} Saved for ${fmt(today)}</div>` : ''}
     ${quick}
-  </div>
+    ${timelineHtml(today)}
+  </section>
   <div class="card">
-    <div class="label">How do you feel today?</div>
-    <div class="row" style="margin-top:8px">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${feel === k ? 'sel' : ''}" data-feel="${k}">${v}</button>`).join('')}</div>
+    <div class="card-title">How do you feel today?</div>
+    <div class="entry">Helps you judge whether off days feel fine before widening.</div>
+    <div class="seg">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${k} ${feel === k ? 'sel' : ''}" data-feel="${k}">${FACE[k]}${v}</button>`).join('')}</div>
   </div>
   <div class="card">
     <details class="logform" id="logform" ${formOpen ? 'open' : ''}>
-      <summary><span>${quick ? 'Log something different' : 'Log a dose'}<br><span class="entry" style="font-weight:400">SOS, late, tremor, other medication</span></span></summary>
-      <div class="row" style="margin-top:12px">
-        ${[0.125, 0.25].map(d => `<button class="dose-btn ${form.dose === d ? 'sel' : ''}" data-dose="${d}">${d}</button>`).join('')}
-        <button class="dose-btn ${form.dose === 'custom' ? 'sel' : ''}" data-dose="custom">Other amount</button>
+      <summary><span><span class="card-title">${quick ? 'Log something different' : 'Log a dose'}</span><br><span class="entry">SOS, late, tremor, other medication</span></span><span class="chev">${ICON.chev}</span></summary>
+      <div class="row" style="margin-top:14px">
+        <button class="dose-btn ${form.dose === 0.125 ? 'sel' : ''}" data-dose="0.125">0.125<small>bridge</small></button>
+        <button class="dose-btn ${form.dose === 0.25 ? 'sel' : ''}" data-dose="0.25">0.25<small>SOS</small></button>
+        <button class="dose-btn ${form.dose === 'custom' ? 'sel' : ''}" data-dose="custom">Other<small>amount</small></button>
       </div>
       <div id="custom-wrap" class="${form.dose === 'custom' ? '' : 'hidden'}">
         <label class="f">Amount (mg) <input id="custom" type="number" inputmode="decimal" step="0.0625" min="0" value="${esc(form.custom || '')}"></label>
@@ -413,7 +580,7 @@ function renderToday() {
       <label class="f">Note (optional) <input id="note" value="${esc(form.note || '')}" placeholder="What happened?"></label>
       <details class="more" ${moreOpen ? 'open' : ''}><summary>Different day, or haven't slept yet?</summary>
         <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
-          <input id="noslept" type="checkbox" style="width:22px;height:22px" ${form.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
+          <input id="noslept" type="checkbox" style="width:22px;height:22px;margin:0" ${form.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
         <label class="f">Date (before 6 AM counts as the previous day)
           <input id="date" type="date" value="${form.date}" max="${ymd(new Date())}"></label>
       </details>
@@ -421,7 +588,7 @@ function renderToday() {
       <button class="primary" id="save">Save</button>
     </details>
   </div>
-  ${info.entries.length ? `<div class="card"><div class="label">Today's entries</div>${info.entries.map(entryHtml).join('')}</div>` : ''}`;
+  ${logged ? `<div class="card"><div class="label">Today's entries</div>${info.entries.map(entryHtml).join('')}</div>` : ''}`;
 
   $('#logform').ontoggle = () => { form.open = $('#logform').open; };
   document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => {
@@ -534,28 +701,42 @@ function pillHtml(total, hasEntries, date) {
 
 function renderHistory() {
   const today = logicalToday();
-  const start = S.entries.length ? S.entries[0].date < S.settings.startDate ? S.entries[0].date : S.settings.startDate : S.settings.startDate;
-  const days = [];
-  for (let d = today; d >= start && days.length < 400; d = addDays(d, -1)) days.push(d);
-  // last 28 days strip, Monday-first weeks
-  const first = addDays(today, -27);
-  const lead = (parse(first).getDay() + 6) % 7;
-  let strip = '<div class="strip">' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<div class="label">${x}</div>`).join('');
-  for (let i = 0; i < lead; i++) strip += '<div></div>';
-  for (let i = 0; i < 28; i++) {
-    const d = addDays(first, i), t = dayInfo(d).total;
-    const cls = t > 0.25 + EPS ? 'p-over' : t >= 0.25 - EPS ? 'p-high' : t > EPS ? 'p-bridge' : 'p-off';
-    strip += `<div class="${cls}" title="${d}">${parse(d).getDate()}</div>`;
+  const f = firstLogged();
+  const start = f && f < S.settings.startDate ? f : S.settings.startDate;
+  // 5-week calendar, Monday first, ending this week
+  const calStart = addDays(mondayOf(today), -28);
+  let cal = '<div class="cal">' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<div class="h">${x}</div>`).join('');
+  for (let i = 0; i < 35; i++) {
+    const d = addDays(calStart, i);
+    if (d > today) { cal += '<div></div>'; continue; }
+    const t = dayInfo(d).total;
+    const cls = t > 0.375 + EPS ? 'over' : t >= 0.25 - EPS ? 'high' : t > EPS ? 'bridge' : '';
+    cal += `<div class="c ${cls} ${d === today ? 'today' : ''}">${parse(d).getDate()}</div>`;
   }
-  strip += '</div>';
+  cal += '</div>';
+  // list grouped by week, newest first
+  let list = '';
+  for (let w = mondayOf(today); w >= mondayOf(start); w = addDays(w, -7)) {
+    let rows = '', total = 0;
+    for (let i = 6; i >= 0; i--) {
+      const d = addDays(w, i);
+      if (d > today || d < start) continue;
+      const info = dayInfo(d); total += info.total;
+      const fl = S.checkins[d];
+      rows += `<div class="day-row"><div class="day-num"><b>${parse(d).getDate()}</b><span>${parse(d).toLocaleDateString(undefined, { weekday: 'short' })}</span></div>
+        <div class="day-body">${fl ? `<span class="feel-tag ${fl}" style="margin-left:0">felt ${FEELINGS[fl].toLowerCase()}</span>` : ''}${info.entries.map(entryHtml).join('') || (!f || d < f ? '<span class="entry">not logged</span>' : '<span class="entry">no entries</span>')}</div>
+        ${pillHtml(info.total, info.entries.length > 0, d)}</div>`;
+    }
+    if (rows) list += `<div class="wk-head"><b>Week of ${short(w)}</b><span>${num(total)} mg</span></div><div class="card" style="margin-top:0;padding:4px 16px">${rows}</div>`;
+  }
   $('#app').innerHTML = `
-    <button class="primary" id="copy-hist" style="margin-top:12px">Copy log</button>
-    <div class="card"><div class="label">Last 4 weeks</div>${strip}
-      <p class="entry" style="margin-bottom:0"><span class="pill p-bridge">0.125</span> <span class="pill p-high">0.25</span> <span class="pill p-over">&gt;0.25</span></p></div>
-    <div class="card">${days.map(d => {
-      const i = dayInfo(d);
-      return `<div class="hist-day"><div><b>${fmt(d)}</b>${S.checkins[d] ? ` <span class="entry">· felt ${FEELINGS[S.checkins[d]].toLowerCase()}</span>` : ''}${i.entries.map(entryHtml).join('')}</div>${pillHtml(i.total, i.entries.length > 0, d)}</div>`;
-    }).join('') || '<p class="plan-text">Nothing logged yet.</p>'}</div>`;
+    <div class="card">
+      <div class="card-title">Last 5 weeks</div>
+      ${cal}
+      <div class="legend"><span><i style="background:var(--c-bridge)"></i>0.125</span><span><i style="background:var(--c-high)"></i>0.25 to 0.375</span><span><i style="background:var(--bad)"></i>above 0.375</span></div>
+    </div>
+    <button class="primary" id="copy-hist" style="margin-top:0">Copy log</button>
+    ${list || '<p class="plan-text">Nothing logged yet.</p>'}`;
   $('#copy-hist').onclick = copyLog;
   bindDeletes();
 }
@@ -640,36 +821,48 @@ function renderTrends() {
   const stat = (k, v, flag) => `<div class="stat"><span>${k}</span><b class="${flag ? 'flag' : ''}">${v}</b></div>`;
 
   const weeks = weeklyData(today);
+  const thisW = weeks.length ? weeks[weeks.length - 1] : null, lastW = weeks.length > 1 ? weeks[weeks.length - 2] : null;
+  const sign = (title, sub, v, flag) => `<div class="sign"><div class="ic ${flag ? 'flagc' : 'okc'}">${flag ? '!' : ICON.check}</div><div class="t">${title}<small>${sub}</small></div><div class="v ${flag ? 'flag' : ''}">${v}</div></div>`;
+  const stepIdx = INTERVAL_STEPS.indexOf(every);
   $('#app').innerHTML = `
-  <div class="card"><div class="label">Milligrams per week (Mon to Sun)</div>
-    <div class="legend"><span><i style="background:var(--c-bridge)"></i>Bridge days (0.125)</span><span><i style="background:var(--c-high)"></i>High days (0.25+)</span></div>
+  <div class="kpis">
+    <div class="kpi"><b>${thisW ? num(thisW.total) : '0'}<small> mg</small></b><span>This week${thisW && thisW.partial ? ' so far' : ''}</span></div>
+    <div class="kpi"><b>${lastW ? num(lastW.total) : '–'}<small>${lastW ? ' mg' : ''}</small></b><span>Last week</span></div>
+    <div class="kpi"><b>${lastHigh ? diffDays(lastHigh, today) : '–'}<small>${lastHigh ? ' d' : ''}</small></b><span>Since last 0.25</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Milligrams per week</div>
+    <div class="legend" style="margin-top:4px"><span><i style="background:var(--c-bridge)"></i>Bridge days (0.125)</span><span><i style="background:var(--c-high)"></i>High days (0.25+)</span></div>
     ${weeklyChartHtml(weeks)}
     <div class="readout" id="wk-readout">${weeks.length ? weekReadout(weeks[weeks.length - 1]) : ''}</div>
-    <p class="entry" style="margin:4px 0 0">Tap a bar for details. Other-medication notes are not counted.</p>
-    ${weeks.length ? `<details style="margin-top:8px"><summary>Show table</summary><table class="wk">
+    <p class="entry" style="margin:8px 0 0">Weeks run Monday to Sunday. Tap a bar for details. Other-medication notes are not counted.</p>
+    ${weeks.length ? `<details style="margin-top:10px"><summary class="entry" style="font-weight:700">Show table</summary><table class="wk">
       <tr><th>Week of</th><th>Total</th><th>Bridge</th><th>High</th><th>Days dosed</th></tr>
       ${weeks.slice().reverse().map(w => `<tr><td>${short(w.start)}${w.partial ? '*' : ''}</td><td>${num(w.total)}</td><td>${num(w.bridge)}</td><td>${num(w.high)}</td><td>${w.dosed}/${w.logged}</td></tr>`).join('')}
     </table><p class="entry">* partial week</p></details>` : ''}
   </div>
-  <div class="card"><div class="label">Warning signs</div>
-    ${stat('Tremor doses, last 30 days (flag at 2)', ws.tremor30, ws.tremor30 >= 2)}
-    ${stat('Very high days, all time (flag above 1)', ws.vhigh, ws.vhigh > 1)}
-    ${stat('3+ high days in 7 days, not one run', ws.cluster ? 'yes, ' + fmt(ws.cluster) : 'no', !!ws.cluster)}
-    ${stat('High days per 28-day block (oldest → now)', ws.blocks.join(' → '), ws.rising)}
-    ${stat('Sleep exceptions, last 30 days (max 2)', sleep30, sleep30 > 2)}
-    ${stat('Days since last high day', lastHigh ? diffDays(lastHigh, today) : 'none logged')}
-    <div class="note info">Red = a warning sign from your plan. Also reassess if 0.25 stops feeling sufficient or you want more.</div>
+  <div class="card">
+    <div class="card-title">Warning signs</div>
+    <div class="entry">From your plan. Red means reassess.</div>
+    ${sign('Tremor doses', 'last 30 days · flag at 2', ws.tremor30, ws.tremor30 >= 2)}
+    ${sign('Very high days', 'all time · flag above 1', ws.vhigh, ws.vhigh > 1)}
+    ${sign('High-day clusters', '3+ in 7 days, not one run', ws.cluster ? short(ws.cluster) : 'none', !!ws.cluster)}
+    ${sign('High days per 28 days', 'oldest → now · flag if rising twice', ws.blocks.join(' → '), ws.rising)}
+    ${sign('Sleep exceptions', 'last 30 days · max 2', sleep30, sleep30 > 2)}
+    <div class="note info">Also reassess if 0.25 stops feeling sufficient or you want more.</div>
   </div>
-  <div class="card"><div class="label">Widening</div>
-    ${stat('Current interval', intervalName(every))}
-    ${stat('Held since', `${fmt(curFrom)} (${held} days)`)}
+  <div class="card">
+    <div class="card-title">Widening</div>
+    <div class="steps">${INTERVAL_STEPS.map((n, i) => `<div class="${i < stepIdx ? 'done' : i === stepIdx ? 'cur' : ''}">${n === 0 ? 'none' : n === 7 ? 'weekly' : 'every ' + n}</div>`).join('')}</div>
+    <div class="stat"><span>Days at this step</span><b>${held} of 14</b></div>
+    <div class="bar"><i style="width:${Math.min(100, held / 14 * 100)}%"></i></div>
     ${stat('Earliest first widening', fmt(widenEarliest()))}
-    ${stat('"Skip 3" option after a 3-day run from', fmt(unlockSkip3()))}
+    ${stat('"Skip 3" option from', fmt(unlockSkip3()))}
     ${stat('How you felt, last 14 days', `${feel14.ok} OK · ${feel14.some} some · ${feel14.rough} rough`)}
     ${next === undefined ? '' : `
       ${widenWarn.length ? widenWarn.map(t => noteHtml({ cls: 'warn', t })).join('') : noteHtml({ cls: 'ok', t: 'No widening warnings.' })}
       <button class="${widenWarn.length ? 'secondary' : 'primary'}" id="widen" style="width:100%;margin-top:12px">Move to ${intervalName(next)}</button>`}
-    ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="margin-top:10px">Undo last interval change</button>` : ''}
+    ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="width:100%;margin-top:10px">Undo last interval change</button>` : ''}
   </div>`;
   document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
     document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));
@@ -690,18 +883,17 @@ function renderTrends() {
 function renderSettings() {
   const st = S.settings;
   $('#app').innerHTML = `
-  <div class="card"><div class="label">Backup</div>
-    <p class="plan-text">Your log lives only on this phone. Back up weekly: tap <b>Back up</b>, pick <b>Drive</b>, then tap <b>Save</b> on the Drive screen.
-    Last backup: <b>${st.lastBackup ? fmt(st.lastBackup.slice(0, 10)) : 'never'}</b></p>
-    <div class="row">
-      <button class="secondary" id="bk">Back up</button>
-      <button class="secondary" id="csv">Export CSV</button>
-      <button class="secondary" id="copy">Copy log as text</button>
-      <button class="secondary" id="restore">Restore</button>
+  <div class="card"><div class="card-title">Your data</div>
+    <div class="entry">Lives only on this phone. Last backup: <b>${st.lastBackup ? fmt(st.lastBackup.slice(0, 10)) : 'never'}</b></div>
+    <div class="tiles">
+      <button class="tile main" id="bk">${ICON.backup}<span>Back up to Drive<br><small>Back up → Drive → tap Save</small></span></button>
+      <button class="tile" id="copy">${ICON.copy}<span>Copy log<br><small>Paste into a chat</small></span></button>
+      <button class="tile" id="csv">${ICON.csv}<span>Export CSV<br><small>For your prescriber</small></span></button>
+      <button class="tile" id="restore" style="grid-column:span 2;flex-direction:row;align-items:center">${ICON.restore}<span>Restore from a backup file</span></button>
       <input type="file" id="file" accept=".json,application/json" class="hidden">
     </div>
   </div>
-  <div class="card"><div class="label">Plan settings</div>
+  <div class="card"><div class="card-title">Plan settings</div>
     <label class="f">Name at the top <input id="s-name" value="${esc(st.medName)}"></label>
     <label class="f">Bridge start date <input id="s-start" type="date" value="${st.startDate}"></label>
     <p class="entry">Earliest first widening: ${fmt(widenEarliest())} (start + 14). "Skip 3" option: from ${fmt(unlockSkip3())} (start + 21).</p>
@@ -709,7 +901,7 @@ function renderSettings() {
       <select id="s-int">${INTERVAL_STEPS.map(n => `<option value="${n}" ${intervalOn(logicalToday()) === n ? 'selected' : ''}>${intervalName(n)}</option>`).join('')}</select></label>
     <button class="primary" id="s-save">Save settings</button>
   </div>
-  <div class="card rules"><details><summary>Plan rules (reference)</summary>
+  <div class="card rules"><details><summary class="card-title" style="display:block">Plan rules (reference)</summary>
     <p><b>Patterns</b></p>
     <ul>
       <li><b>Normal:</b> 0.125 → 0 → 0.125 → 0 → 0.125</li>
@@ -732,7 +924,8 @@ function renderSettings() {
       <li><b>Hard limits:</b> above 0.25/day (except 0.375 with the extra 0.25 at night for sleep). 0.125 two days in a row. 4th high day in a row. Sleep exception two nights in a row or more than twice in 30 days.</li>
       <li><b>Warning signs:</b> 2+ tremor doses in 30 days. More than one very high day. 3+ high days in 7 days not in one run. High days rising two 28-day blocks in a row.</li>
     </ul></details></div>
-  <div class="card"><button class="secondary" id="wipe" style="color:var(--bad)">Erase all data on this phone</button></div>`;
+  <button class="danger" id="wipe">Erase all data on this phone</button>
+  <div class="version">Dose Log · version ${APP_VERSION}</div>`;
 
   $('#bk').onclick = backup;
   $('#csv').onclick = exportCsv;

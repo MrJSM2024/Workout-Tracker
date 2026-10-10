@@ -25,6 +25,10 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   The display name is typed into the app and stored locally.
 
 ## UI notes
+- Visual system: tokens on :root (light) and prefers-color-scheme dark; cards with soft shadow, 20px radius;
+  icon bottom nav; per-tab large title. `APP_VERSION` is shown in Settings, bump it on each release.
+- Today hero card changes by state (green = dose due, neutral = off/logged) and has a 7-day timeline:
+  3 past days (actual), today, 3 future days projected by `projection()` (simulated, never saved).
 - Today: one-tap "I took 0.125" / "Confirm off day" from the plan card, undo toast after every save,
   daily "How do you feel" check-in (stored in `S.checkins[date]`: ok / some / rough), and a collapsed
   "Log something different" form for SOS, late, tremor and other-medication entries.
