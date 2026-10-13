@@ -280,6 +280,24 @@
   .list div { padding: 8px 0; border-bottom: 1px solid var(--line); }
   .list div:last-child { border-bottom: 0; }
   .section-label { margin: 18px 0 0; }
+
+  /* catch-up, tags, backup line */
+  .catch { border: 1.5px solid var(--warn-soft); }
+  .catch-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .catch-actions .secondary { padding: 14px 6px; text-align: center; }
+  .catch-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+  .linkbtn { border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 13px; padding: 10px 8px; text-decoration: underline; }
+  .tagrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tag { padding: 10px 14px; border-radius: 999px; border: 0; background: var(--raised); color: var(--muted); font-weight: 700; font-size: 14px; }
+  .tag.sel { background: var(--warn-soft); color: var(--warn); }
+  .tags-inline { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
+  .tags-inline .feel-tag { display: inline-block; margin: 0; }
+  .p-gap { background: transparent; border: 1.5px dashed var(--warn); color: var(--warn); padding: 3px 8px; min-width: 70px; }
+  .cal .c.gap { outline: 1.5px dashed var(--warn); outline-offset: -3px; }
+  .backup-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 16px 4px 0; font-size: 13px; color: var(--muted); }
+  .backup-line button { border: 0; background: none; color: var(--accent); font-weight: 800; padding: 10px 8px; }
+  .insight p { margin: 6px 0 0; font-size: 15px; }
+  .insight p:first-of-type { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -312,7 +330,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-13';
+const APP_VERSION = '2026-10-13b';
 const PRESETS = {
   bridge:   { label: '0.125', sub: 'Bridge dose', dose: 0.125, reason: 'scheduled' },
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
@@ -323,6 +341,23 @@ const PRESETS = {
   custom:   { label: 'Other', sub: 'Different amount', dose: null, reason: 'other', amount: true },
 };
 const sortEntries = () => S.entries.sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
+const SYMPTOM_TAGS = ['Poor sleep', 'Anxiety', 'Hard day ahead'];
+const symOf = d => S.symptoms[d] || { tags: [], note: '' };
+function setSym(d, patch) {
+  const cur = symOf(d);
+  const next = { tags: cur.tags.slice(), note: cur.note, ...patch };
+  next.tags = SYMPTOM_TAGS.filter(t => next.tags.includes(t)).concat(next.tags.filter(t => !SYMPTOM_TAGS.includes(t)));
+  const note = (next.note || '').trim();
+  if (!next.tags.length && !note) delete S.symptoms[d]; else S.symptoms[d] = { tags: next.tags, note };
+  save();
+}
+function toggleTag(d, tag) { const cur = symOf(d).tags; setSym(d, { tags: cur.includes(tag) ? cur.filter(t => t !== tag) : [...cur, tag] }); }
+const tagButtons = (d, attr) => `<div class="tagrow">${SYMPTOM_TAGS.map(t => `<button class="tag ${symOf(d).tags.includes(t) ? 'sel' : ''}" ${attr}="${esc(t)}">${esc(t)}</button>`).join('')}</div>`;
+function debouncedNote(input, d) {
+  let t = null;
+  input.oninput = () => { clearTimeout(t); const v = input.value; t = setTimeout(() => setSym(d, { note: v }), 350); };
+  input.onblur = () => { clearTimeout(t); setSym(d, { note: input.value }); };
+}
 const buzz = (ms = 12) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} };
 const FACE = {
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01" stroke-width="3"/></svg>',
@@ -355,6 +390,8 @@ function migrate(s) {
     st.rulesVersion = 2;
   }
   if (!s.checkins || typeof s.checkins !== 'object') s.checkins = {};
+  if (!s.symptoms || typeof s.symptoms !== 'object') s.symptoms = {};
+  if (!s.skipped || typeof s.skipped !== 'object') s.skipped = {};
   return s;
 }
 function load() {
@@ -362,7 +399,7 @@ function load() {
     const s = JSON.parse(localStorage.getItem(KEY));
     if (s && Array.isArray(s.entries)) return migrate(s);
   } catch (e) {}
-  return { entries: [], checkins: {}, settings: { medName: 'My medicine', startDate: null, intervals: [], lastBackup: null, rulesVersion: 2 } };
+  return { entries: [], checkins: {}, symptoms: {}, skipped: {}, settings: { medName: 'My medicine', startDate: null, intervals: [], lastBackup: null, rulesVersion: 2 } };
 }
 let S = load();
 function save() {
@@ -379,7 +416,8 @@ const diffDays = (a, b) => Math.round((parse(b) - parse(a)) / 86400000); // b - 
 const fmt = s => parse(s).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 // Spec 1: a dose before 6 AM belongs to the previous day.
 const DAY_CUTOFF_HOUR = 6;
-function logicalToday() { const d = new Date(); if (d.getHours() < DAY_CUTOFF_HOUR) d.setDate(d.getDate() - 1); return ymd(d); }
+function logicalOf(when) { const d = new Date(when); if (d.getHours() < DAY_CUTOFF_HOUR) d.setDate(d.getDate() - 1); return ymd(d); }
+function logicalToday() { return logicalOf(Date.now()); }
 const mg = n => `${+n.toFixed(4)} mg`;
 const unlockSkip3 = () => addDays(S.settings.startDate, 21);
 const widenEarliest = () => addDays(S.settings.startDate, 14);
@@ -465,7 +503,7 @@ function planCore(date) {
 function dueOrLate(due, date, text, notes) {
   if (date === due) return { kind: 'due', head: '0.125', text, notes };
   notes.push({ cls: 'warn', t: `Was due ${fmt(due)}. Take it once, today. The count restarts from today. Never double up.` });
-  return { kind: 'due', head: '0.125', text: text + ' (late)', notes };
+  return { kind: 'due', head: '0.125', text: text.replace(/\.$/, '') + ', late.', notes, late: true };
 }
 
 function sleepDaysIn(endDate, days, extraDate) {
@@ -508,7 +546,7 @@ function checks(date, extra = 0, reason = null) {
   if (type === 'bridge' && extra > 0 && cur.total < EPS) {
     const p = planFor(date);
     if (p && p.kind === 'off' && reason !== 'tremor' && reason !== 'sos')
-      w.push('The plan says today is an off day.');
+      w.push('The plan says this day is an off day.');
   }
   return w;
 }
@@ -608,7 +646,14 @@ function renderToday() {
   const today = logicalToday();
   const p = planFor(today);
   const info = dayInfo(today);
-  const backupDue = S.entries.length && (!S.settings.lastBackup || diffDays(S.settings.lastBackup.slice(0, 10), today) >= 7);
+  const lb = S.settings.lastBackup;
+  const lbAge = lb ? Math.max(0, diffDays(logicalOf(lb), today)) : null;
+  const backupDue = S.entries.length && (lbAge === null || lbAge >= 7);
+  const unsaved = lb ? S.entries.filter(e => e.at > lb).length : S.entries.length;
+  const backupLine = S.entries.length && !backupDue
+    ? `<div class="backup-line"><span>Last backup: ${lbAge === 0 ? 'today' : lbAge + ' day' + (lbAge > 1 ? 's' : '') + ' ago'}${unsaved ? ` · ${unsaved} new entr${unsaved === 1 ? 'y' : 'ies'} since` : ''}</span><button id="bk-line">Back up</button></div>` : '';
+  const gaps = gapDays(today);
+  const sym = symOf(today);
   const feel = S.checkins[today];
   const logged = info.entries.length > 0;
   const choice = p.head.includes(' or ');
@@ -625,12 +670,14 @@ function renderToday() {
     quick = `<div class="quick"><button class="btn-hero" id="q-off">Confirm off day</button></div>`;
 
   $('#app').innerHTML = `
-  ${backupDue ? `<div class="banner"><span>No backup in 7+ days</span><button id="bk-now">Back up</button></div>` : ''}
+  ${backupDue ? `<div class="banner"><span>${lbAge === null ? 'No backup yet' : 'No backup in ' + lbAge + ' days'}</span><button id="bk-now">Back up</button></div>` : ''}
+  ${catchUpHtml(gaps)}
   <section class="hero ${heroCls}">
     <div class="eyebrow">${logged ? 'Logged today' : 'Plan for today'}</div>
     <h2>${title}</h2>
     <div class="sub">${esc(p.text)}</div>
     ${(p.notes || []).map(n => `<div class="chip ${n.cls === 'info' ? '' : n.cls}">${esc(n.t)}</div>`).join('')}
+    ${gaps.length ? '<div class="chip warn">Earlier days are not logged, so this plan may change. Catch up above.</div>' : ''}
     ${logged ? `<div class="done-badge ${pop ? 'pop' : ''}">${ICON.check} Saved for ${fmt(today)}</div>` : ''}
     ${quick}
     ${timelineHtml(today)}
@@ -639,6 +686,9 @@ function renderToday() {
     <div class="card-title">How do you feel today?</div>
     <div class="entry">Helps you judge whether off days feel fine before widening.</div>
     <div class="seg">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${k} ${feel === k ? 'sel' : ''}" data-feel="${k}">${FACE[k]}${v}</button>`).join('')}</div>
+    <div class="label section-label" style="margin-top:16px">Anything going on?</div>
+    ${tagButtons(today, 'data-tag')}
+    <input id="sym-note" placeholder="Optional: describe how today is going" value="${esc(sym.note)}" style="margin-top:10px">
   </div>
   <div class="card">
     <div class="card-title">${logged ? 'Add another entry' : 'Log something different'}</div>
@@ -648,17 +698,62 @@ function renderToday() {
       <button class="chip-btn more" data-preset=""><b>More</b><span>Sleep, other med, amount</span></button>
     </div>
   </div>
-  ${logged ? `<div class="card tappable" data-day="${today}"><div class="label">Today's entries · tap to edit</div>${info.entries.map(entryHtml).join('')}</div>` : ''}`;
+  ${logged ? `<div class="card tappable" data-day="${today}"><div class="label">Today's entries · tap to edit</div>${info.entries.map(entryHtml).join('')}</div>` : ''}
+  ${backupLine}`;
 
   document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => {
     const k = b.dataset.feel;
     if (S.checkins[today] === k) delete S.checkins[today]; else S.checkins[today] = k;
     buzz(8); save(); renderToday();
   });
+  document.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => { toggleTag(today, b.dataset.tag); buzz(8); renderToday(); });
+  if ($('#sym-note')) debouncedNote($('#sym-note'), today);
+  document.querySelectorAll('[data-gap]').forEach(b => b.onclick = () => catchUpAction(b.dataset.gap, b.dataset.d, gaps));
   document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => openLog({ preset: b.dataset.preset }));
-  if ($('#q-take')) $('#q-take').onclick = () => takeBridge(today, p.text.includes('(late)') ? 'late' : 'scheduled');
+  if ($('#q-take')) $('#q-take').onclick = () => takeBridge(today, p.late ? 'late' : 'scheduled');
   if ($('#q-off')) $('#q-off').onclick = () => saveOff(today);
   if ($('#bk-now')) $('#bk-now').onclick = e => { e.preventDefault(); backup(); };
+  if ($('#bk-line')) $('#bk-line').onclick = backup;
+}
+
+// ---------- catch-up for days with no entry ----------
+function gapDays(today) {
+  const f = firstLogged(); if (!f) return [];
+  const back = addDays(today, -7);
+  const out = [];
+  for (let d = back > f ? back : f; d < today; d = addDays(d, 1))
+    if (!dayInfo(d).entries.length && !S.skipped[d]) out.push(d);
+  return out;
+}
+function catchUpHtml(gaps) {
+  if (!gaps.length) return '';
+  const d = gaps[0], rest = gaps.length - 1, plan = planLabel(d);
+  return `<div class="card catch">
+    <div class="card-title">Catch up: ${fmt(d)}</div>
+    <div class="entry">Nothing is logged for this day.${plan ? ' ' + plan + ' (from your log so far).' : ''} The plan depends on an accurate history.</div>
+    <div class="catch-actions">
+      <button class="secondary" data-gap="take" data-d="${d}">Took 0.125</button>
+      <button class="secondary" data-gap="off" data-d="${d}">Off day</button>
+      <button class="secondary" data-gap="other" data-d="${d}">Other</button>
+    </div>
+    <div class="catch-foot"><span class="entry">${rest ? rest + ' more day' + (rest > 1 ? 's' : '') + ' after this' : ''}</span>
+      <span>${rest ? `<button class="linkbtn" data-gap="alloff" data-d="${d}">Mark all ${gaps.length} as off</button>` : ''}<button class="linkbtn" data-gap="skip" data-d="${d}">Skip</button></span></div>
+  </div>`;
+}
+async function catchUpAction(kind, d, gaps) {
+  if (kind === 'take') { const p = planFor(d); return takeBridge(d, p && p.kind === 'due' ? 'scheduled' : 'other'); }
+  if (kind === 'off') return saveOff(d);
+  if (kind === 'other') return openLog({ date: d });
+  if (kind === 'skip') {
+    S.skipped[d] = true; save(); render();
+    return showToast('Skipped. You can still fill it in from History.', () => { delete S.skipped[d]; save(); render(); });
+  }
+  if (kind === 'alloff') {
+    const ok = await askConfirm({ title: `Mark ${gaps.length} days as off?`, sub: 'Only if you took nothing on these days.', items: gaps.map(g => fmt(g)), ok: 'Mark as off' });
+    if (!ok) return;
+    const ids = gaps.map(g => addEntry({ date: g, dose: 0, reason: 'off', note: '' }));
+    buzz(); showToast(`Marked ${ids.length} days as off`, () => { S.entries = S.entries.filter(e => !ids.includes(e.id)); save(); render(); });
+  }
 }
 
 // ---------- sheets, toasts, confirms ----------
@@ -749,11 +844,11 @@ async function takeBridge(date, reason, { forceConfirm = false, sub = '' } = {})
     if (!ok) return;
   }
   const id = addEntry({ date, dose: 0.125, reason, note: '' });
-  buzz(); showToast('Saved: 0.125 mg today', () => removeEntry(id));
+  buzz(); showToast(`Saved: 0.125 mg ${date === logicalToday() ? 'today' : 'on ' + fmt(date)}`, () => removeEntry(id));
 }
 function saveOff(date) {
   const id = addEntry({ date, dose: 0, reason: 'off', note: '' });
-  buzz(); showToast('Saved: off day', () => removeEntry(id));
+  buzz(); showToast(`Saved: off day${date === logicalToday() ? '' : ' on ' + fmt(date)}`, () => removeEntry(id));
 }
 
 // ---------- log sheet ----------
@@ -873,6 +968,8 @@ function openDay(startDate) {
       ${future ? '' : `
         <div class="label section-label">How did you feel?</div>
         <div class="seg">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${k} ${fl === k ? 'sel' : ''}" data-dfeel="${k}">${FACE[k]}${v}</button>`).join('')}</div>
+        ${tagButtons(date, 'data-dtag')}
+        <input id="d-note" placeholder="Optional note for this day" value="${esc(symOf(date).note)}" style="margin-top:10px">
         <div class="sheet-actions">
           <button class="primary" id="d-add">Add entry</button>
           ${info.entries.length ? '' : '<button class="secondary wide" id="d-off">Mark as off day</button>'}
@@ -883,6 +980,8 @@ function openDay(startDate) {
       if (S.checkins[date] === k) delete S.checkins[date]; else S.checkins[date] = k;
       buzz(8); save(); render(); draw();
     });
+    sh.el.querySelectorAll('[data-dtag]').forEach(b => b.onclick = () => { toggleTag(date, b.dataset.dtag); buzz(8); render(); draw(); });
+    const dn = sh.el.querySelector('#d-note'); if (dn) debouncedNote(dn, date);
     const add = sh.el.querySelector('#d-add'); if (add) add.onclick = () => { const d = date; sh.close(); openLog({ date: d }); };
     const off = sh.el.querySelector('#d-off'); if (off) off.onclick = () => { saveOff(date); draw(); };
   };
@@ -936,7 +1035,11 @@ document.addEventListener('keydown', e => {
 function firstLogged() { return S.entries.length ? S.entries[0].date : null; }
 function pillHtml(total, hasEntries, date) {
   const f = firstLogged();
-  if (!hasEntries && (!f || date < f)) return `<span class="pill p-off">not logged</span>`;
+  if (!hasEntries) {
+    if (!f || date < f) return `<span class="pill p-off">before log</span>`;
+    if (date === logicalToday()) return `<span class="pill p-off">today</span>`;
+    return `<span class="pill p-gap">${S.skipped[date] ? 'skipped' : 'not logged'}</span>`;
+  }
   if (hasEntries && total < EPS && dayInfo(date).entries.some(e => e.reason === 'othermed')) return `<span class="pill p-off">other</span>`;
   if (!hasEntries || total < EPS) return `<span class="pill p-off">${hasEntries ? 'off ✓' : 'off'}</span>`;
   const cls = total > 0.25 + EPS ? 'p-over' : total >= 0.25 - EPS ? 'p-high' : 'p-bridge';
@@ -954,7 +1057,8 @@ function renderHistory() {
     const d = addDays(calStart, i);
     if (d > today) { cal += '<div></div>'; continue; }
     const t = dayInfo(d).total;
-    const cls = t > 0.375 + EPS ? 'over' : t >= 0.25 - EPS ? 'high' : t > EPS ? 'bridge' : '';
+    const gap = !dayInfo(d).entries.length && f && d >= f && d < today && !S.skipped[d];
+    const cls = (t > 0.375 + EPS ? 'over' : t >= 0.25 - EPS ? 'high' : t > EPS ? 'bridge' : '') + (gap ? ' gap' : '');
     cal += `<button class="c ${cls} ${d === today ? 'today' : ''}" data-day="${d}" aria-label="${fmt(d)}">${parse(d).getDate()}</button>`;
   }
   cal += '</div>';
@@ -966,9 +1070,11 @@ function renderHistory() {
       const d = addDays(w, i);
       if (d > today || d < start) continue;
       const info = dayInfo(d); total += info.total;
-      const fl = S.checkins[d];
+      const fl = S.checkins[d], sy = S.symptoms[d];
+      const tagBits = (fl ? `<span class="feel-tag ${fl}">felt ${FEELINGS[fl].toLowerCase()}</span>` : '') + (sy ? sy.tags.map(t => `<span class="feel-tag">${esc(t)}</span>`).join('') : '');
+      const gapText = !f || d < f ? 'before you started logging' : d === today ? 'nothing yet today' : S.skipped[d] ? 'skipped' : 'not logged · tap to fill in';
       rows += `<div class="day-row" data-day="${d}" role="button" tabindex="0"><div class="day-num"><b>${parse(d).getDate()}</b><span>${parse(d).toLocaleDateString(undefined, { weekday: 'short' })}</span></div>
-        <div class="day-body">${fl ? `<span class="feel-tag ${fl}" style="margin-left:0">felt ${FEELINGS[fl].toLowerCase()}</span>` : ''}${info.entries.map(entryHtml).join('') || (!f || d < f ? '<span class="entry">not logged</span>' : '<span class="entry">no entries</span>')}</div>
+        <div class="day-body">${tagBits ? `<div class="tags-inline">${tagBits}</div>` : ''}${info.entries.map(entryHtml).join('') || `<span class="entry">${gapText}</span>`}${sy && sy.note ? `<div class="entry">“${esc(sy.note)}”</div>` : ''}</div>
         ${pillHtml(info.total, info.entries.length > 0, d)}</div>`;
     }
     if (rows) list += `<div class="wk-head"><b>Week of ${short(w)}</b><span>${num(total)} mg</span></div><div class="card" style="margin-top:0;padding:4px 16px">${rows}</div>`;
@@ -981,7 +1087,7 @@ function renderHistory() {
     </div>
     <button class="primary" id="copy-hist" style="margin-top:0">Copy log</button>
     ${list || '<p class="plan-text">Nothing logged yet.</p>'}`;
-  $('#copy-hist').onclick = copyLog;
+  $('#copy-hist').onclick = openCopy;
 }
 
 // ---------- weekly chart ----------
@@ -991,16 +1097,18 @@ function weeklyData(today, maxWeeks = 12) {
   if (!f) return [];
   const weeks = [];
   for (let w = mondayOf(f); w <= today; w = addDays(w, 7)) {
-    let bridge = 0, high = 0, dosed = 0, logged = 0;
+    let bridge = 0, high = 0, dosed = 0, logged = 0, unlogged = 0, highDays = 0;
     for (let i = 0; i < 7; i++) {
       const d = addDays(w, i);
       if (d > today || d < f) continue;
       logged++;
       const info = dayInfo(d);
+      if (!info.entries.length && d < today && !S.skipped[d]) unlogged++;
+      if (isHigh(info.type)) highDays++;
       if (info.total > EPS) dosed++;
       if (info.type === 'bridge') bridge += info.total; else if (isHigh(info.type)) high += info.total;
     }
-    weeks.push({ start: w, bridge, high, total: bridge + high, dosed, logged, partial: addDays(w, 6) > today || w < f });
+    weeks.push({ start: w, bridge, high, total: bridge + high, dosed, logged, unlogged, highDays, partial: addDays(w, 6) > today || w < f });
   }
   return weeks.slice(-maxWeeks);
 }
@@ -1028,8 +1136,9 @@ function weeklyChartHtml(weeks) {
     const hb = (w.bridge / top) * ph, hh = (w.high / top) * ph;
     const gap = hb > 0 && hh > 0 ? 2 : 0;
     g += `<rect class="bg" data-bg="${i}" x="${L + slot * i + 2}" y="${T}" width="${slot - 4}" height="${ph}" rx="4"/>`;
-    g += `<path d="${path(x, y(w.bridge), hb, hh === 0)}" fill="var(--c-bridge)"/>`;
-    g += `<path d="${path(x, y(w.bridge) - gap - hh, hh, true)}" fill="var(--c-high)"/>`;
+    const fo = w.partial ? '.5' : '1';
+    g += `<path d="${path(x, y(w.bridge), hb, hh === 0)}" fill="var(--c-bridge)" fill-opacity="${fo}"/>`;
+    g += `<path d="${path(x, y(w.bridge) - gap - hh, hh, true)}" fill="var(--c-high)" fill-opacity="${fo}"/>`;
     if ((i === weeks.length - 1 || i === maxIdx) && w.total > 0)
       g += `<text class="val" x="${x + bw / 2}" y="${y(w.total) - (gap ? 2 : 0) - 4}" text-anchor="middle">${num(w.total)}</text>`;
     if (weeks.length <= 6 || i % Math.ceil(weeks.length / 6) === 0 || i === weeks.length - 1)
@@ -1039,7 +1148,41 @@ function weeklyChartHtml(weeks) {
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Milligrams per week, last ${weeks.length} weeks">${g}</svg></div>`;
 }
 function weekReadout(w) {
-  return `<b>Week of ${short(w.start)}${w.partial ? ' (partial)' : ''}:</b> ${num(w.total)} mg total · ${num(w.bridge)} bridge · ${num(w.high)} high · ${w.dosed} of ${w.logged} days dosed`;
+  return `<b>Week of ${short(w.start)}${w.partial ? ' (partial week)' : ''}:</b> ${num(w.total)} mg total · ${num(w.bridge)} bridge · ${num(w.high)} high · ${w.dosed} of ${w.logged} days dosed${w.unlogged ? ` · ${w.unlogged} not logged` : ''}`;
+}
+function daysChartHtml(weeks) {
+  if (!weeks.length) return '';
+  const W = 340, H = 130, L = 24, Rt = 6, T = 16, B = 22, ph = H - T - B, pw = W - L - Rt, top = 7;
+  const y = v => T + ph - (v / top) * ph;
+  const slot = pw / weeks.length, bw = Math.min(24, slot * 0.6);
+  let g = '';
+  [0, 2, 4, 6].forEach(v => { g += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${v}</text>`; });
+  const maxIdx = weeks.reduce((m, w, i) => w.dosed > weeks[m].dosed ? i : m, 0);
+  weeks.forEach((w, i) => {
+    const x = L + slot * i + (slot - bw) / 2, h = (w.dosed / top) * ph, yt = y(w.dosed);
+    if (h > 0) { const r = Math.min(4, h, bw / 2); g += `<path d="M${x},${yt + h}V${yt + r}Q${x},${yt} ${x + r},${yt}H${x + bw - r}Q${x + bw},${yt} ${x + bw},${yt + r}V${yt + h}Z" fill="var(--muted)" fill-opacity="${w.partial ? '.5' : '1'}"/>`; }
+    if ((i === weeks.length - 1 || i === maxIdx) && w.dosed > 0) g += `<text class="val" x="${x + bw / 2}" y="${yt - 4}" text-anchor="middle">${w.dosed}</text>`;
+    if (weeks.length <= 6 || i % Math.ceil(weeks.length / 6) === 0 || i === weeks.length - 1) g += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${short(w.start)}</text>`;
+  });
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Days dosed per week, last ${weeks.length} weeks">${g}</svg></div>`;
+}
+function trendInsight(today) {
+  const weeks = weeklyData(today, 520);
+  const cur = weeks[weeks.length - 1];
+  if (!cur) return [];
+  const prev = weeks.length > 1 ? weeks[weeks.length - 2] : null;
+  const n = diffDays(cur.start, today) + 1, plural = n > 1 ? 's' : '';
+  const out = [];
+  if (prev && !prev.partial) {
+    let same = 0;
+    for (let i = 0; i < n; i++) same += dayInfo(addDays(prev.start, i)).total;
+    const delta = cur.total - same;
+    const rel = Math.abs(delta) < EPS ? 'no change' : delta < 0 ? `down ${num(-delta)} mg` : `up ${num(delta)} mg`;
+    out.push(`<b>This week so far:</b> ${num(cur.total)} mg over ${n} day${plural}. Same ${n === 1 ? 'day' : n + ' days'} last week: ${num(same)} mg (${rel}).`);
+    out.push(`High days: ${cur.highDays} this week so far, ${prev.highDays} last week.`);
+  } else out.push(`<b>This week so far:</b> ${num(cur.total)} mg over ${n} day${plural}. Not enough earlier history to compare yet.`);
+  if (cur.unlogged) out.push(`${cur.unlogged} day${cur.unlogged > 1 ? 's' : ''} this week not logged, so totals may be low.`);
+  return out;
 }
 
 function renderTrends() {
@@ -1067,23 +1210,30 @@ function renderTrends() {
   const thisW = weeks.length ? weeks[weeks.length - 1] : null, lastW = weeks.length > 1 ? weeks[weeks.length - 2] : null;
   const sign = (title, sub, v, flag) => `<div class="sign"><div class="ic ${flag ? 'flagc' : 'okc'}">${flag ? '!' : ICON.check}</div><div class="t">${title}<small>${sub}</small></div><div class="v ${flag ? 'flag' : ''}">${v}</div></div>`;
   const stepIdx = INTERVAL_STEPS.indexOf(every);
+  const insight = trendInsight(today);
+  const days14 = [...Array(14)].map((_, i) => addDays(today, -i));
+  const checked14 = days14.filter(d => S.checkins[d] || symOf(d).tags.length || symOf(d).note).length;
   $('#app').innerHTML = `
   <div class="kpis">
     <div class="kpi"><b>${thisW ? num(thisW.total) : '0'}<small> mg</small></b><span>This week${thisW && thisW.partial ? ' so far' : ''}</span></div>
     <div class="kpi"><b>${lastW ? num(lastW.total) : '–'}<small>${lastW ? ' mg' : ''}</small></b><span>Last week</span></div>
     <div class="kpi"><b>${lastHigh ? diffDays(lastHigh, today) : '–'}<small>${lastHigh ? ' d' : ''}</small></b><span>Since last 0.25</span></div>
   </div>
+  ${insight.length ? `<div class="card insight"><div class="card-title">This week</div>${insight.map(t => `<p>${t}</p>`).join('')}</div>` : ''}
   <div class="card">
     <div class="card-title">Milligrams per week</div>
-    <div class="legend" style="margin-top:4px"><span><i style="background:var(--c-bridge)"></i>Bridge days (0.125)</span><span><i style="background:var(--c-high)"></i>High days (0.25+)</span></div>
+    <div class="legend" style="margin-top:4px"><span><i style="background:var(--c-bridge)"></i>Bridge days (0.125)</span><span><i style="background:var(--c-high)"></i>High days (0.25+)</span><span><i style="background:var(--muted);opacity:.5"></i>Lighter bar = partial week</span></div>
     ${weeklyChartHtml(weeks)}
     <div class="readout" id="wk-readout">${weeks.length ? weekReadout(weeks[weeks.length - 1]) : ''}</div>
     <p class="entry" style="margin:8px 0 0">Weeks run Monday to Sunday. Tap a bar for details. Other-medication notes are not counted.</p>
     ${weeks.length ? `<details style="margin-top:10px"><summary class="entry" style="font-weight:700">Show table</summary><table class="wk">
-      <tr><th>Week of</th><th>Total</th><th>Bridge</th><th>High</th><th>Days dosed</th></tr>
-      ${weeks.slice().reverse().map(w => `<tr><td>${short(w.start)}${w.partial ? '*' : ''}</td><td>${num(w.total)}</td><td>${num(w.bridge)}</td><td>${num(w.high)}</td><td>${w.dosed}/${w.logged}</td></tr>`).join('')}
+      <tr><th>Week of</th><th>Total</th><th>Bridge</th><th>High</th><th>Dosed</th><th>Not logged</th></tr>
+      ${weeks.slice().reverse().map(w => `<tr><td>${short(w.start)}${w.partial ? '*' : ''}</td><td>${num(w.total)}</td><td>${num(w.bridge)}</td><td>${num(w.high)}</td><td>${w.dosed}/${w.logged}</td><td>${w.unlogged}</td></tr>`).join('')}
     </table><p class="entry">* partial week</p></details>` : ''}
   </div>
+  ${weeks.length ? `<div class="card"><div class="card-title">Days dosed per week</div>
+    <div class="entry">Out of 7. Lighter bar = partial week.</div>
+    ${daysChartHtml(weeks)}</div>` : ''}
   <div class="card">
     <div class="card-title">Warning signs</div>
     <div class="entry">From your plan. Red means reassess.</div>
@@ -1093,6 +1243,14 @@ function renderTrends() {
     ${sign('High days per 28 days', 'oldest → now · flag if rising twice', ws.blocks.join(' → '), ws.rising)}
     ${sign('Sleep exceptions', 'last 30 days · max 2', sleep30, sleep30 > 2)}
     <div class="note info">Also reassess if 0.25 stops feeling sufficient or you want more.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Check-ins, last 14 days</div>
+    <div class="entry">${checked14} of 14 days checked in</div>
+    ${stat('Felt OK', feel14.ok + (feel14.ok === 1 ? ' day' : ' days'))}
+    ${stat('Some symptoms', feel14.some + (feel14.some === 1 ? ' day' : ' days'))}
+    ${stat('Rough', feel14.rough + (feel14.rough === 1 ? ' day' : ' days'))}
+    ${SYMPTOM_TAGS.map(t => stat(t, `${days14.filter(d => symOf(d).tags.includes(t)).length} of 14 days`)).join('')}
   </div>
   <div class="card">
     <div class="card-title">Widening</div>
@@ -1129,7 +1287,7 @@ function renderSettings() {
   const st = S.settings;
   $('#app').innerHTML = `
   <div class="card"><div class="card-title">Your data</div>
-    <div class="entry">Lives only on this phone. Last backup: <b>${st.lastBackup ? fmt(st.lastBackup.slice(0, 10)) : 'never'}</b></div>
+    <div class="entry">Lives only on this phone. Last backup: <b>${st.lastBackup ? fmt(logicalOf(st.lastBackup)) : 'never'}</b></div>
     <div class="tiles">
       <button class="tile main" id="bk">${ICON.backup}<span>Back up to Drive<br><small>Back up → Drive → tap Save</small></span></button>
       <button class="tile" id="copy">${ICON.copy}<span>Copy log<br><small>Paste into a chat</small></span></button>
@@ -1174,7 +1332,7 @@ function renderSettings() {
 
   $('#bk').onclick = backup;
   $('#csv').onclick = exportCsv;
-  $('#copy').onclick = copyLog;
+  $('#copy').onclick = openCopy;
   $('#restore').onclick = () => $('#file').click();
   $('#file').onchange = restore;
   $('#s-save').onclick = () => {
@@ -1221,22 +1379,54 @@ async function shareOrDownload(name, text, type) {
 async function backup() {
   const name = `dose-log-backup-${logicalToday()}.json`;
   const ok = await shareOrDownload(name, JSON.stringify({ app: 'doselog', version: 1, exportedAt: new Date().toISOString(), data: S }, null, 2), 'application/json');
-  if (ok) { S.settings.lastBackup = new Date().toISOString(); save(); render(); }
+  if (!ok) return;
+  const saved = await askConfirm({ title: 'Did the backup save?', sub: 'In Drive you have to tap Save. If you saw it upload, or can find the file in Drive, choose yes.', ok: 'Yes, it saved', cancel: 'No, not saved' });
+  if (saved) { S.settings.lastBackup = new Date().toISOString(); save(); render(); buzz(); showToast('Backup recorded'); }
+  else showToast('Backup not recorded. Tap Back up to try again.');
 }
-// Plain-text log for pasting into a chat or note.
-function logText() {
+// Plain-text log for pasting into a chat or note. range: 14, 30, 'sum' (summary only, 28 days) or 'all'.
+function logText(range = 'all') {
   const st = S.settings, today = logicalToday();
-  const lines = [`DOSE LOG (${st.medName}), exported ${today}`,
+  const first = S.entries.length && S.entries[0].date < st.startDate ? S.entries[0].date : st.startDate;
+  const win = range === 14 ? 14 : range === 30 ? 30 : range === 'sum' ? 28 : null;
+  const from = win && addDays(today, -(win - 1)) > first ? addDays(today, -(win - 1)) : first;
+  const nDays = diffDays(from, today) + 1, f1 = firstLogged();
+  let total = 0, bridge = 0, high = 0, dosed = 0, highDays = 0, vhighDays = 0, sosDays = 0, sleepDays = 0, unlogged = 0, checked = 0;
+  const feel = { ok: 0, some: 0, rough: 0 }, tagN = {}, others = [];
+  for (let d = from; d <= today; d = addDays(d, 1)) {
+    const i = dayInfo(d);
+    if (!i.entries.length && f1 && d >= f1 && d < today && !S.skipped[d]) unlogged++;
+    total += i.total;
+    if (i.type === 'bridge') bridge += i.total; else if (isHigh(i.type)) { high += i.total; highDays++; if (i.type === 'vhigh') vhighDays++; }
+    if (i.total > EPS) dosed++;
+    if (i.entries.some(e => e.reason === 'sos')) sosDays++;
+    if (i.entries.some(e => e.reason === 'sleep')) sleepDays++;
+    i.entries.filter(e => e.reason === 'othermed').forEach(e => others.push(`${d}: ${e.note}`));
+    if (S.checkins[d]) { feel[S.checkins[d]]++; checked++; }
+    symOf(d).tags.forEach(t => { tagN[t] = (tagN[t] || 0) + 1; });
+  }
+  const label = range === 'all' ? 'all days' : range === 'sum' ? 'summary only, last 28 days' : `last ${range} days`;
+  const lines = [`DOSE LOG (${st.medName}), exported ${today}, ${label}`,
     `Plan start: ${st.startDate}. Current interval: ${intervalName(intervalOn(today))}.`,
     `Interval history: ${[...st.intervals].sort((a, b) => a.from.localeCompare(b.from)).map(i => `${i.from} ${intervalName(i.every)}`).join('; ')}`,
-    '', 'date | total mg | entries (dose, reason, note, time logged)'];
-  const start = S.entries.length && S.entries[0].date < st.startDate ? S.entries[0].date : st.startDate;
-  for (let d = start; d <= today; d = addDays(d, 1)) {
-    const i = dayInfo(d);
-    const es = i.entries.filter(e => e.dose > 0 || e.note).map(e => e.dose === 0 ? `note: "${e.note}"` :
-      `${e.dose} ${REASONS[e.reason] || e.reason}${e.note ? ' "' + e.note + '"' : ''}${e.reason === 'backfill' ? '' : ' @' + new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
-    const none = !i.entries.length && (!firstLogged() || d < firstLogged());
-    lines.push(`${d} | ${none ? '-' : +i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : none ? 'not logged' : 'off')}${S.checkins[d] ? ' | felt: ' + FEELINGS[S.checkins[d]] : ''}`);
+    '', `SUMMARY (${from} to ${today}, ${nDays} days)`,
+    `Total: ${num(total)} mg (bridge days ${num(bridge)}, high days ${num(high)}). About ${num(total / nDays * 7)} mg per 7 days.`,
+    `Days dosed: ${dosed} of ${nDays}. High days: ${highDays} (SOS ${sosDays}, sleep exception ${sleepDays}). Very high days: ${vhighDays}.`,
+    `Days not logged: ${unlogged}.`,
+    `Other medication notes: ${others.length ? others.join('; ') : 'none'}.`,
+    `Check-ins: ${checked} of ${nDays} days. Felt OK ${feel.ok}, some symptoms ${feel.some}, rough ${feel.rough}.`];
+  const tagLine = SYMPTOM_TAGS.filter(t => tagN[t]).map(t => `${t} ${tagN[t]}`).join(', ');
+  if (tagLine) lines.push(`Tags: ${tagLine}.`);
+  if (range !== 'sum') {
+    lines.push('', 'date | total mg | entries (dose, reason, note, time logged)');
+    for (let d = from; d <= today; d = addDays(d, 1)) {
+      const i = dayInfo(d), sy = S.symptoms[d];
+      const es = i.entries.filter(e => e.dose > 0 || e.note).map(e => e.dose === 0 ? `note: "${e.note}"` :
+        `${e.dose} ${REASONS[e.reason] || e.reason}${e.note ? ' "' + e.note + '"' : ''}${e.reason === 'backfill' ? '' : ' @' + new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+      const none = !i.entries.length;
+      const extra = (S.checkins[d] ? ' | felt: ' + FEELINGS[S.checkins[d]] : '') + (sy && sy.tags.length ? ' | tags: ' + sy.tags.join(', ') : '') + (sy && sy.note ? ` | note: "${sy.note}"` : '');
+      lines.push(`${d} | ${none ? '-' : +i.total.toFixed(4)} | ${es.join('; ') || (i.entries.length ? 'off (confirmed)' : d === today ? 'not logged yet' : S.skipped[d] ? 'skipped' : 'not logged')}${extra}`);
+    }
   }
   const ws = warningSigns(today);
   lines.push('', 'WARNING SIGNS (per plan)',
@@ -1246,11 +1436,23 @@ function logText() {
     `High days per 28-day block, oldest to now: ${ws.blocks.join(', ')}${ws.rising ? ' (rising, flagged)' : ''}`,
     `Sleep exceptions, last 30 days: ${sleepDaysIn(today, 30)} (max 2)`);
   lines.push('', 'WEEKLY TOTALS (Mon to Sun, mg)');
-  weeklyData(today, 520).forEach(w => lines.push(`Week of ${w.start}${w.partial ? ' (partial)' : ''}: ${num(w.total)} total (bridge ${num(w.bridge)}, high ${num(w.high)}), ${w.dosed}/${w.logged} days dosed`));
+  weeklyData(today, 520).filter(w => addDays(w.start, 6) >= from).forEach(w => lines.push(`Week of ${w.start}${w.partial ? ' (partial)' : ''}: ${num(w.total)} total (bridge ${num(w.bridge)}, high ${num(w.high)}), ${w.dosed}/${w.logged} days dosed${w.unlogged ? `, ${w.unlogged} not logged` : ''}`));
   return lines.join('\n');
 }
-async function copyLog() {
-  const t = logText();
+function openCopy() {
+  const sh = makeSheet(`
+    <div class="sheet-title">Copy log</div>
+    <div class="sheet-sub">A summary is always at the top. Pick how many daily lines to include.</div>
+    <div class="chips">
+      <button class="chip-btn" data-r="14"><b>Last 14 days</b><span>Summary + daily lines</span></button>
+      <button class="chip-btn" data-r="30"><b>Last 30 days</b><span>Summary + daily lines</span></button>
+      <button class="chip-btn" data-r="all"><b>Everything</b><span>Since the start</span></button>
+      <button class="chip-btn" data-r="sum"><b>Summary only</b><span>Last 28 days, no daily lines</span></button>
+    </div>`);
+  sh.el.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { const r = b.dataset.r; sh.close(); copyLog(r === 'all' || r === 'sum' ? r : +r); });
+}
+async function copyLog(range = 'all') {
+  const t = logText(range);
   try { await navigator.clipboard.writeText(t); buzz(); showToast('Copied. Paste it into your chat or note.'); }
   catch (e) { shareOrDownload(`dose-log-${logicalToday()}.txt`, t, 'text/plain'); }
 }
@@ -1268,7 +1470,7 @@ function restore(ev) {
       const j = JSON.parse(r.result);
       const data = j.data || j;
       if (!Array.isArray(data.entries) || !data.settings) throw new Error('Not a Dose Log backup file.');
-      const ok = await askConfirm({ title: 'Replace the log on this phone?', sub: `Backup from ${j.exportedAt ? fmt(j.exportedAt.slice(0, 10)) : 'the file'} with ${data.entries.length} entries replaces what is here now.`, ok: 'Replace', danger: true });
+      const ok = await askConfirm({ title: 'Replace the log on this phone?', sub: `Backup from ${j.exportedAt ? fmt(logicalOf(j.exportedAt)) : 'the file'} with ${data.entries.length} entries replaces what is here now.`, ok: 'Replace', danger: true });
       if (!ok) return;
       S = migrate(data); save(); tab = 'today'; render(); showToast('Restored');
     } catch (e) { showToast('Could not restore: ' + e.message); }
@@ -1310,7 +1512,7 @@ async function handleLaunchAction() {
   if (dayInfo(today).entries.length) { showToast('Already logged today. Tap the day to edit.'); return; }
   if (action === 'take') {
     const p = planFor(today);
-    await takeBridge(today, p && p.text.includes('(late)') ? 'late' : 'scheduled', { forceConfirm: true, sub: p ? p.text : '' });
+    await takeBridge(today, p && p.late ? 'late' : 'scheduled', { forceConfirm: true, sub: p ? p.text : '' });
   } else if (action === 'off') {
     if (await askConfirm({ title: 'Confirm today as an off day?', ok: 'Confirm' })) saveOff(today);
   }

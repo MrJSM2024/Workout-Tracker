@@ -25,6 +25,17 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   The display name is typed into the app and stored locally.
 
 ## UI notes
+- Data completeness: a day with no entry is "not logged", never "off" (History pill, calendar dashes, copied log).
+  Today shows a one-at-a-time catch-up card for unlogged days in the last 7 (`gapDays()`); answers: took 0.125,
+  off day, other, skip (`S.skipped[date]`), or mark all as off. The plan engine treats unlogged days as off, so
+  the hero warns when gaps exist.
+- Daily check-in = feeling (`S.checkins[date]`: ok/some/rough) + tags and note (`S.symptoms[date] = {tags, note}`;
+  tags from `SYMPTOM_TAGS`, canonical order). Shown in History, day sheet, Trends (14-day counts) and the copied log.
+- Backup: after the share sheet returns, the app asks "Did the backup save?" and only records `lastBackup` on yes.
+  Today shows backup age plus entries added since (`e.at > lastBackup`). Use `logicalOf()` for any date derived from a
+  timestamp (6 AM day cutoff), never `slice(0, 10)`.
+- Copy log opens a range sheet (14 days, 30 days, everything, summary only); `logText(range)` always starts with a SUMMARY.
+- Trends: partial weeks are drawn at 50% opacity; `trendInsight()` compares this week so far with the same days last week.
 - No native alert/confirm anywhere. Use `askConfirm()` (bottom sheet, returns a Promise), `showToast(text, undoFn)`,
   and `makeSheet()`. One history entry stands in for "a sheet is open" so the Android back button closes the
   sheet; `releaseMarker()` defers `history.back()` so close-then-open never races. Do not call `history.back()` elsewhere.
