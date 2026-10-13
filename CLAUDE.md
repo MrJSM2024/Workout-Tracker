@@ -25,6 +25,13 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   The display name is typed into the app and stored locally.
 
 ## UI notes
+- No native alert/confirm anywhere. Use `askConfirm()` (bottom sheet, returns a Promise), `showToast(text, undoFn)`,
+  and `makeSheet()`. One history entry stands in for "a sheet is open" so the Android back button closes the
+  sheet; `releaseMarker()` defers `history.back()` so close-then-open never races. Do not call `history.back()` elsewhere.
+- Tapping any day (timeline, History calendar, History rows, Today's entries) opens `openDay()`: view, edit, delete
+  (with Undo), add, set the day's check-in. Logging goes through `openLog()` presets (`PRESETS`), not an inline form.
+- Manifest `shortcuts` (long-press the icon) launch `?action=take|off|sos`, handled by `handleLaunchAction()`;
+  take and off always ask for confirmation.
 - Visual system: tokens on :root (light) and prefers-color-scheme dark; cards with soft shadow, 20px radius;
   icon bottom nav; per-tab large title. `APP_VERSION` is shown in Settings, bump it on each release.
 - Today hero card changes by state (green = dose due, neutral = off/logged) and has a 7-day timeline:

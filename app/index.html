@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dose Log</title>
-<meta name="theme-color" content="#14532d">
+<meta name="theme-color" content="#f3f2ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d110f" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -138,9 +139,12 @@
   /* toast */
   #toast { position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto;
     background: var(--text); color: var(--card); border-radius: 16px; padding: 14px 16px; display: flex; justify-content: space-between;
-    align-items: center; gap: 10px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; }
-  #toast.hidden { display: none; }
-  #toast button { border: 0; background: none; color: var(--accent-soft); font-weight: 800; padding: 4px; text-decoration: underline; }
+    align-items: center; gap: 10px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 200;
+    opacity: 0; transform: translateY(14px); pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.85,.25,1); }
+  #toast.show { opacity: 1; transform: none; pointer-events: auto; }
+  #toast .tmsg { display: flex; align-items: center; gap: 8px; }
+  #toast button { border: 0; background: none; color: var(--accent-soft); font-weight: 800; padding: 6px 4px; text-decoration: underline; }
+  #toast button:active { transform: none; opacity: .7; }
 
   /* history */
   .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 12px; }
@@ -218,6 +222,64 @@
   .rules li { margin-bottom: 6px; }
   .danger { width: 100%; padding: 14px; border-radius: 16px; border: 1.5px solid var(--bad-soft); background: none; color: var(--bad); font-weight: 700; }
   .version { text-align: center; font-size: 12px; color: var(--faint); margin: 18px 0 6px; }
+
+  /* app-like behavior */
+  html, body { overscroll-behavior-y: contain; }
+  body { touch-action: manipulation; }
+  button, nav, .tl { -webkit-user-select: none; user-select: none; }
+  button { transition: transform .12s ease, background-color .15s ease, opacity .15s ease; }
+  button:active { transform: scale(.97); }
+  .day-row, .tappable { cursor: pointer; transition: background-color .15s; }
+  .day-row:active, .tappable:active { background: var(--raised); }
+  .view-in { animation: viewin .22s ease both; }
+  @keyframes viewin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes popin { 0% { transform: scale(.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .done-badge.pop { animation: popin .4s cubic-bezier(.2,1.4,.4,1) both; }
+  .done-badge.pop svg path, .tcheck path { stroke-dasharray: 26; stroke-dashoffset: 26; animation: draw .4s .15s ease forwards; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; animation-delay: 0s !important; transition-duration: .001ms !important; }
+  }
+  button.tl { background: none; border: 0; color: inherit; padding: 0; font: inherit; font-size: 11px; font-weight: 600; }
+  button.tl:active { transform: none; }
+  button.tl:active .dot { transform: scale(.9); }
+  .tl .dot { transition: transform .12s ease; }
+  .cal button.c { border: 0; padding: 0; font-family: inherit; }
+  .cal button.c:active { transform: scale(.9); }
+
+  /* bottom sheets */
+  .scrim { position: fixed; inset: 0; background: rgba(8,12,10,.5); opacity: 0; transition: opacity .25s ease; }
+  .scrim.show { opacity: 1; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; background: var(--card);
+    border-radius: 28px 28px 0 0; padding: 8px 18px 0; max-height: 90vh; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain;
+    transform: translateY(105%); transition: transform .3s cubic-bezier(.2,.85,.25,1); box-shadow: 0 -12px 48px rgba(0,0,0,.28); }
+  .sheet.show { transform: none; }
+  .sheet-body { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+  .grab { width: 42px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 16px; }
+  .sheet-title { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+  .sheet-sub { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .sheet-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+  .sheet-actions .primary { margin-top: 0; }
+  .secondary.wide { width: 100%; text-align: center; }
+  .primary.danger-fill { background: var(--bad); color: #fff; }
+  .primary.warnbtn { background: var(--warn); color: var(--card); }
+  .danger-text { width: 100%; padding: 14px; border: 0; background: none; color: var(--bad); font-weight: 700; }
+  .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .chip-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 12px 14px; min-height: 58px; border-radius: 16px;
+    border: 2px solid transparent; background: var(--raised); color: var(--text); text-align: left; }
+  .chip-btn b { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+  .chip-btn span { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .chip-btn.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .chip-btn.more b { color: var(--muted); }
+  .entry-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; padding: 14px;
+    margin-top: 8px; border: 0; border-radius: 16px; background: var(--raised); color: var(--text); font-size: 16px; font-weight: 700; }
+  .entry-line small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; margin-top: 1px; }
+  .chev-r { color: var(--faint); font-size: 24px; line-height: 1; flex: none; }
+  .empty { color: var(--muted); padding: 14px 0 4px; }
+  .list { max-height: 28vh; overflow-y: auto; margin-top: 12px; padding: 4px 14px; border-radius: 14px; background: var(--raised); font-size: 14px; }
+  .list div { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .list div:last-child { border-bottom: 0; }
+  .section-label { margin: 18px 0 0; }
 </style>
 </head>
 <body>
@@ -226,7 +288,7 @@
   <h1 id="title">Today</h1>
 </header>
 <main id="app"></main>
-<div id="toast" class="hidden"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <nav>
   <button data-tab="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/></svg>Today</button>
   <button data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>History</button>
@@ -250,7 +312,18 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-10';
+const APP_VERSION = '2026-10-13';
+const PRESETS = {
+  bridge:   { label: '0.125', sub: 'Bridge dose', dose: 0.125, reason: 'scheduled' },
+  sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
+  sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
+  late:     { label: '0.125', sub: 'Late dose', dose: 0.125, reason: 'late' },
+  tremor:   { label: '0.125', sub: 'Tremor or tingling', dose: 0.125, reason: 'tremor' },
+  othermed: { label: 'Other med', sub: 'Note only, not counted', dose: null, reason: 'othermed', amount: true, name: true },
+  custom:   { label: 'Other', sub: 'Different amount', dose: null, reason: 'other', amount: true },
+};
+const sortEntries = () => S.entries.sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
+const buzz = (ms = 12) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} };
 const FACE = {
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01" stroke-width="3"/></svg>',
   some: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><path d="M9 9h.01M15 9h.01" stroke-width="3"/></svg>',
@@ -262,6 +335,7 @@ const ICON = {
   csv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>',
   restore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
   chev: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  checkAnim: '<svg class="tcheck" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
   check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
 };
 const INTERVAL_STEPS = [2, 3, 4, 7, 0]; // 0 = none
@@ -293,7 +367,7 @@ function load() {
 let S = load();
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
-  catch (e) { alert('Could not save on this device: ' + e.message); }
+  catch (e) { showToast('Could not save on this device: ' + e.message); }
 }
 
 // ---------- dates (local, YYYY-MM-DD) ----------
@@ -462,14 +536,18 @@ function allDays() { return [...new Set(S.entries.map(e => e.date))].sort(); }
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let tab = 'today';
-let form = { dose: null, reason: 'scheduled' };
+let lastTab = null;
+let justSaved = false;
 
 function render() {
   $('#title').textContent = { today: 'Today', history: 'History', trends: 'Trends', settings: 'Settings' }[tab];
   $('#eyebrow').textContent = `${S.settings.medName || 'Dose Log'} · ${fmt(logicalToday())}`;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-  if (!S.settings.startDate) return renderSetup();
+  const app = $('#app');
+  if (tab !== lastTab) { app.classList.remove('view-in'); void app.offsetWidth; app.classList.add('view-in'); if (lastTab) window.scrollTo(0, 0); lastTab = tab; }
+  if (!S.settings.startDate) { renderSetup(); justSaved = false; return; }
   ({ today: renderToday, history: renderHistory, trends: renderTrends, settings: renderSettings })[tab]();
+  justSaved = false;
 }
 
 function renderSetup() {
@@ -485,7 +563,7 @@ function renderSetup() {
   </div>`;
   $('#su-go').onclick = () => {
     const d = $('#su-start').value;
-    if (!d) return alert('Pick a start date.');
+    if (!d) return showToast('Pick a start date.');
     S.settings.medName = $('#su-name').value.trim() || 'My medicine';
     S.settings.startDate = d;
     S.settings.intervals = [{ from: d, every: 2 }];
@@ -522,20 +600,20 @@ function timelineHtml(today) {
     } else if (d in proj) cls = proj[d] ? 'd-plan' : 'd-off';
     else cls = 'd-none d-off';
     const wd = parse(d).toLocaleDateString(undefined, { weekday: 'narrow' });
-    h += `<div class="tl ${i === 0 ? 'today' : ''}"><span class="wd">${wd}</span><div class="dot ${cls}">${txt}</div><span class="dn"><span>${parse(d).getDate()}</span></span></div>`;
+    h += `<button class="tl ${i === 0 ? 'today' : ''}" data-day="${d}" aria-label="${fmt(d)}"><span class="wd">${wd}</span><div class="dot ${cls}">${txt}</div><span class="dn"><span>${parse(d).getDate()}</span></span></button>`;
   }
-  return h + `</div><div class="tl-legend"><span><i style="background:var(--c-bridge)"></i>0.125</span><span><i style="background:var(--c-high)"></i>0.25+</span><span><i style="border:1.5px dashed currentColor"></i>planned</span></div>`;
+  return h + `</div><div class="tl-legend"><span><i style="background:var(--c-bridge)"></i>0.125</span><span><i style="background:var(--c-high)"></i>0.25+</span><span><i style="border:1.5px dashed currentColor"></i>planned</span><span>tap a day</span></div>`;
 }
 function renderToday() {
   const today = logicalToday();
   const p = planFor(today);
   const info = dayInfo(today);
   const backupDue = S.entries.length && (!S.settings.lastBackup || diffDays(S.settings.lastBackup.slice(0, 10), today) >= 7);
-  if (form.date === undefined) form.date = today;
   const feel = S.checkins[today];
   const logged = info.entries.length > 0;
   const choice = p.head.includes(' or ');
   const heroCls = logged ? 'done' : p.kind === 'due' ? 'dose' : 'off';
+  const pop = justSaved;
   let title, quick = '';
   if (logged) title = info.total > EPS ? `${num(info.total)} <small>mg logged</small>` : 'Off day';
   else if (p.kind === 'due') title = choice ? '0.125 <small>or off</small>' : `0.125 <small>mg today</small>`;
@@ -545,8 +623,6 @@ function renderToday() {
     quick = `<div class="quick"><button class="btn-hero" id="q-take">I took 0.125</button>${choice ? '<button class="btn-hero ghost" id="q-off">Off today</button>' : ''}</div>`;
   else if (!logged && p.kind === 'off')
     quick = `<div class="quick"><button class="btn-hero" id="q-off">Confirm off day</button></div>`;
-  const formOpen = form.open || form.dose != null;
-  const moreOpen = form.noSleep || form.date !== today;
 
   $('#app').innerHTML = `
   ${backupDue ? `<div class="banner"><span>No backup in 7+ days</span><button id="bk-now">Back up</button></div>` : ''}
@@ -555,7 +631,7 @@ function renderToday() {
     <h2>${title}</h2>
     <div class="sub">${esc(p.text)}</div>
     ${(p.notes || []).map(n => `<div class="chip ${n.cls === 'info' ? '' : n.cls}">${esc(n.t)}</div>`).join('')}
-    ${logged ? `<div class="done-badge">${ICON.check} Saved for ${fmt(today)}</div>` : ''}
+    ${logged ? `<div class="done-badge ${pop ? 'pop' : ''}">${ICON.check} Saved for ${fmt(today)}</div>` : ''}
     ${quick}
     ${timelineHtml(today)}
   </section>
@@ -565,130 +641,298 @@ function renderToday() {
     <div class="seg">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${k} ${feel === k ? 'sel' : ''}" data-feel="${k}">${FACE[k]}${v}</button>`).join('')}</div>
   </div>
   <div class="card">
-    <details class="logform" id="logform" ${formOpen ? 'open' : ''}>
-      <summary><span><span class="card-title">${quick ? 'Log something different' : 'Log a dose'}</span><br><span class="entry">SOS, late, tremor, other medication</span></span><span class="chev">${ICON.chev}</span></summary>
-      <div class="row" style="margin-top:14px">
-        <button class="dose-btn ${form.dose === 0.125 ? 'sel' : ''}" data-dose="0.125">0.125<small>bridge</small></button>
-        <button class="dose-btn ${form.dose === 0.25 ? 'sel' : ''}" data-dose="0.25">0.25<small>SOS</small></button>
-        <button class="dose-btn ${form.dose === 'custom' ? 'sel' : ''}" data-dose="custom">Other<small>amount</small></button>
-      </div>
-      <div id="custom-wrap" class="${form.dose === 'custom' ? '' : 'hidden'}">
-        <label class="f">Amount (mg) <input id="custom" type="number" inputmode="decimal" step="0.0625" min="0" value="${esc(form.custom || '')}"></label>
-      </div>
-      <label class="f">Reason
-        <select id="reason">${Object.entries(REASONS).filter(([k]) => k !== 'backfill').map(([k, v]) => `<option value="${k}" ${form.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-      <label class="f">Note (optional) <input id="note" value="${esc(form.note || '')}" placeholder="What happened?"></label>
-      <details class="more" ${moreOpen ? 'open' : ''}><summary>Different day, or haven't slept yet?</summary>
-        <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
-          <input id="noslept" type="checkbox" style="width:22px;height:22px;margin:0" ${form.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
-        <label class="f">Date (before 6 AM counts as the previous day)
-          <input id="date" type="date" value="${form.date}" max="${ymd(new Date())}"></label>
-      </details>
-      <div id="live-warn"></div>
-      <button class="primary" id="save">Save</button>
-    </details>
+    <div class="card-title">${logged ? 'Add another entry' : 'Log something different'}</div>
+    <div class="entry">Off-plan doses and other medication</div>
+    <div class="chips">
+      ${['sos', 'late', 'tremor'].map(k => `<button class="chip-btn" data-preset="${k}"><b>${PRESETS[k].label}</b><span>${PRESETS[k].sub}</span></button>`).join('')}
+      <button class="chip-btn more" data-preset=""><b>More</b><span>Sleep, other med, amount</span></button>
+    </div>
   </div>
-  ${logged ? `<div class="card"><div class="label">Today's entries</div>${info.entries.map(entryHtml).join('')}</div>` : ''}`;
+  ${logged ? `<div class="card tappable" data-day="${today}"><div class="label">Today's entries · tap to edit</div>${info.entries.map(entryHtml).join('')}</div>` : ''}`;
 
-  $('#logform').ontoggle = () => { form.open = $('#logform').open; };
   document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => {
     const k = b.dataset.feel;
     if (S.checkins[today] === k) delete S.checkins[today]; else S.checkins[today] = k;
-    save(); renderToday();
+    buzz(8); save(); renderToday();
   });
-  document.querySelectorAll('[data-dose]').forEach(b => b.onclick = () => {
-    syncForm();
-    const v = b.dataset.dose; form.dose = v === 'custom' ? 'custom' : +v;
-    if (form.dose === 0.25 && form.reason === 'scheduled') form.reason = 'sos';
-    if (form.dose === 0.125 && form.reason === 'sos') form.reason = 'scheduled';
-    renderToday();
-  });
-  $('#noslept').onchange = () => {
-    syncForm(); form.noSleep = $('#noslept').checked;
-    form.date = form.noSleep ? addDays(ymd(new Date()), -1) : logicalToday();
-    renderToday();
-  };
-  ['reason', 'date', 'note', 'custom'].forEach(id => { const el = $('#' + id); if (el) el.oninput = () => { syncForm(); liveWarn(); }; });
-  $('#save').onclick = saveDose;
-  if ($('#q-take')) $('#q-take').onclick = () => {
-    const reason = p.text.includes('(late)') ? 'late' : 'scheduled';
-    const w = checks(today, 0.125, reason);
-    if (w.length && !confirm('Heads up:\n\n• ' + w.join('\n• ') + '\n\nSave anyway?')) return;
-    const id = addEntry({ date: today, dose: 0.125, reason, note: '' });
-    showToast('Saved: 0.125 mg today', () => removeEntry(id));
-  };
-  if ($('#q-off')) $('#q-off').onclick = () => {
-    const id = addEntry({ date: today, dose: 0, reason: 'off', note: '' });
-    showToast('Saved: off day', () => removeEntry(id));
-  };
+  document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => openLog({ preset: b.dataset.preset }));
+  if ($('#q-take')) $('#q-take').onclick = () => takeBridge(today, p.text.includes('(late)') ? 'late' : 'scheduled');
+  if ($('#q-off')) $('#q-off').onclick = () => saveOff(today);
   if ($('#bk-now')) $('#bk-now').onclick = e => { e.preventDefault(); backup(); };
-  bindDeletes();
-  liveWarn();
 }
+
+// ---------- sheets, toasts, confirms ----------
+const sheetStack = [];
+let sheetZ = 30, histMarker = false, suppressPop = 0, releaseTimer = null;
+// Give back the history entry only if no new sheet opened right after the last one closed
+// (close-then-open in the same moment must not race with history.back()).
+function releaseMarker() {
+  clearTimeout(releaseTimer);
+  releaseTimer = setTimeout(() => {
+    if (!sheetStack.length && histMarker) { histMarker = false; suppressPop++; history.back(); }
+  }, 80);
+}
+function makeSheet(html, { onClose } = {}) {
+  const scrim = document.createElement('div'); scrim.className = 'scrim';
+  const el = document.createElement('div'); el.className = 'sheet';
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+  el.innerHTML = `<div class="grab"></div><div class="sheet-body">${html}</div>`;
+  scrim.style.zIndex = ++sheetZ; el.style.zIndex = ++sheetZ;
+  document.body.append(scrim, el);
+  requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show'); }));
+  let closed = false;
+  const ctl = {
+    el, body: el.querySelector('.sheet-body'),
+    set(h) { ctl.body.innerHTML = h; },
+    get open() { return !closed; },
+    close(fromPop) {
+      if (closed) return; closed = true;
+      const i = sheetStack.indexOf(ctl); if (i >= 0) sheetStack.splice(i, 1);
+      scrim.classList.remove('show'); el.classList.remove('show');
+      setTimeout(() => { scrim.remove(); el.remove(); }, 300);
+      // One history entry stands in for "a sheet is open", so the Android back button closes the sheet instead of the app.
+      if (fromPop) { if (sheetStack.length) history.pushState({ sheet: 1 }, ''); else histMarker = false; }
+      else if (!sheetStack.length) releaseMarker();
+      if (onClose) onClose();
+    },
+  };
+  scrim.onclick = () => ctl.close();
+  sheetStack.push(ctl);
+  if (!histMarker) { history.pushState({ sheet: 1 }, ''); histMarker = true; }
+  return ctl;
+}
+window.addEventListener('popstate', () => {
+  if (suppressPop > 0) { suppressPop--; return; }
+  const top = sheetStack[sheetStack.length - 1];
+  if (top) top.close(true);
+  else if (histMarker) histMarker = false; // the marker entry was already used up by this back press
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetStack.length) sheetStack[sheetStack.length - 1].close(); });
+
+function askConfirm({ title, sub = '', lines = [], items = [], ok = 'Confirm', cancel = 'Cancel', danger = false }) {
+  return new Promise(resolve => {
+    let decided = false;
+    const done = v => { if (!decided) { decided = true; resolve(v); } };
+    const sh = makeSheet(`<div class="sheet-title">${esc(title)}</div>${sub ? `<div class="sheet-sub">${esc(sub)}</div>` : ''}
+      ${lines.map(t => noteHtml({ cls: 'warn', t })).join('')}
+      ${items.length ? `<div class="list">${items.map(t => `<div>${esc(t)}</div>`).join('')}</div>` : ''}
+      <div class="sheet-actions"><button class="primary ${danger ? 'danger-fill' : ''}" data-r="1">${esc(ok)}</button><button class="secondary wide" data-r="0">${esc(cancel)}</button></div>`,
+      { onClose: () => done(false) });
+    sh.el.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { done(b.dataset.r === '1'); sh.close(); });
+  });
+}
+
 let toastTimer = null;
 function showToast(text, undo) {
   const t = $('#toast');
-  t.innerHTML = `<span>${esc(text)}</span>${undo ? '<button id="t-undo">Undo</button>' : ''}`;
-  t.classList.remove('hidden');
+  t.innerHTML = `<span class="tmsg">${undo ? ICON.checkAnim : ''}<span>${esc(text)}</span></span>${undo ? '<button id="t-undo">Undo</button>' : ''}`;
+  t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
-  if (undo) $('#t-undo').onclick = () => { undo(); t.classList.add('hidden'); };
+  toastTimer = setTimeout(() => t.classList.remove('show'), undo ? 6000 : 3500);
+  if (undo) $('#t-undo').onclick = () => { undo(); t.classList.remove('show'); };
 }
-function removeEntry(id) { S.entries = S.entries.filter(e => e.id !== id); save(); render(); }
-function syncForm() {
-  form.reason = $('#reason').value; form.date = $('#date').value; form.note = $('#note').value;
-  if ($('#custom')) form.custom = $('#custom').value;
-}
-function formDose() { return form.dose === 'custom' ? parseFloat(form.custom) : form.dose; }
-function liveWarn() {
-  const d = formDose();
-  const el = $('#live-warn');
-  if (!el) return;
-  if (!(d > 0) || !form.date) { el.innerHTML = ''; return; }
-  if (form.reason === 'othermed') { el.innerHTML = noteHtml({ cls: 'info', t: 'Saved as a note. Not counted in the day total. Put the medication name in Note.' }); return; }
-  el.innerHTML = checks(form.date, d, form.reason).map(t => noteHtml({ cls: 'bad', t })).join('');
-}
-function saveDose() {
-  syncForm();
-  const d = formDose();
-  if (!(d > 0)) return alert('Pick a dose first.');
-  if (!form.date) return alert('Pick a date.');
-  if (form.date > ymd(new Date())) return alert('That date is in the future.');
-  if (form.reason === 'othermed') {
-    if (!form.note) return alert('Type the medication name in the Note field.');
-    const id = addEntry({ date: form.date, dose: 0, reason: 'othermed', note: `${d} mg ${form.note}` });
-    form = { dose: null, reason: 'scheduled' };
-    showToast(`Saved note: ${d} mg ${S.entries.find(e => e.id === id).note.replace(/^[\d.]+ mg /, '')}`, () => removeEntry(id));
-    return;
-  }
-  const w = checks(form.date, d, form.reason);
-  if (w.length && !confirm('Heads up:\n\n• ' + w.join('\n• ') + '\n\nSave anyway?')) return;
-  const date = form.date;
-  const id = addEntry({ date, dose: d, reason: form.reason, note: form.note || '' });
-  form = { dose: null, reason: 'scheduled' };
-  showToast(`Saved: ${mg(d)}${date !== logicalToday() ? ' on ' + fmt(date) : ' today'}`, () => removeEntry(id));
-}
+
+// ---------- saving ----------
 function addEntry(e) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   S.entries.push({ id, at: new Date().toISOString(), ...e });
-  S.entries.sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
+  sortEntries();
+  justSaved = true;
   save(); render();
   return id;
 }
-function entryHtml(e) {
+function removeEntry(id) { S.entries = S.entries.filter(e => e.id !== id); save(); render(); }
+async function takeBridge(date, reason, { forceConfirm = false, sub = '' } = {}) {
+  const w = checks(date, 0.125, reason);
+  if (w.length || forceConfirm) {
+    const ok = await askConfirm({ title: w.length ? 'Heads up' : 'Log 0.125 mg for today?', sub: w.length ? 'This dose breaks a plan rule. You can still save it.' : sub, lines: w, ok: w.length ? 'Save anyway' : 'Log it' });
+    if (!ok) return;
+  }
+  const id = addEntry({ date, dose: 0.125, reason, note: '' });
+  buzz(); showToast('Saved: 0.125 mg today', () => removeEntry(id));
+}
+function saveOff(date) {
+  const id = addEntry({ date, dose: 0, reason: 'off', note: '' });
+  buzz(); showToast('Saved: off day', () => removeEntry(id));
+}
+
+// ---------- log sheet ----------
+function openLog(opts = {}) {
+  const today = logicalToday();
+  const lg = { key: opts.preset || '', amount: '', note: '', reason: null, date: opts.date || today, noSleep: false, more: false };
+  const sh = makeSheet('');
+  const preset = () => PRESETS[lg.key];
+  const doseOf = () => { const p = preset(); return !p ? NaN : p.dose != null ? p.dose : parseFloat(lg.amount); };
+  const reasonOf = () => lg.reason || (preset() ? preset().reason : null);
+  const REASON_CHOICES = ['scheduled', 'sos', 'sleep', 'tremor', 'late', 'other'];
+
+  const sync = () => {
+    const g = id => sh.el.querySelector('#' + id);
+    if (g('lg-amt')) lg.amount = g('lg-amt').value;
+    if (g('lg-note')) lg.note = g('lg-note').value;
+    if (g('lg-date')) lg.date = g('lg-date').value;
+    if (g('lg-reason')) lg.reason = g('lg-reason').value;
+  };
+  const warnings = () => {
+    const d = doseOf(), r = reasonOf();
+    if (!(d > 0) || !lg.date || r === 'othermed') return [];
+    return checks(lg.date, d, r);
+  };
+  const updateWarn = () => {
+    const w = warnings(), el = sh.el.querySelector('#lg-warn'), btn = sh.el.querySelector('#lg-save');
+    if (!el || !btn) return;
+    el.innerHTML = w.map(t => noteHtml({ cls: 'bad', t })).join('');
+    btn.textContent = w.length ? 'Save anyway' : 'Save';
+    btn.classList.toggle('warnbtn', w.length > 0);
+  };
+  const err = t => { const el = sh.el.querySelector('#lg-err'); if (el) el.innerHTML = noteHtml({ cls: 'bad', t }); };
+  const draw = () => {
+    const p = preset();
+    sh.set(`
+      <div class="sheet-title">Log a dose</div>
+      <div class="sheet-sub">${fmt(lg.date)}${lg.date === today ? ' (today)' : ''}</div>
+      <div class="chips">${Object.entries(PRESETS).map(([k, v]) => `<button class="chip-btn ${lg.key === k ? 'sel' : ''}" data-k="${k}"><b>${v.label}</b><span>${v.sub}</span></button>`).join('')}</div>
+      ${p ? `
+        ${p.amount ? `<label class="f">Amount (mg)<input id="lg-amt" type="number" inputmode="decimal" step="0.0625" min="0" value="${esc(lg.amount)}"></label>` : ''}
+        <label class="f">${p.name ? 'Medication name' : 'Note (optional)'}<input id="lg-note" value="${esc(lg.note)}" placeholder="${p.name ? 'e.g. Rize' : 'What happened?'}"></label>
+        <details class="more" ${lg.more || lg.noSleep || lg.date !== today ? 'open' : ''}><summary>Different day, or change the reason</summary>
+          <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
+            <input id="lg-noslept" type="checkbox" style="width:22px;height:22px;margin:0" ${lg.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
+          <label class="f">Date (before 6 AM counts as the previous day)<input id="lg-date" type="date" value="${lg.date}" max="${ymd(new Date())}"></label>
+          ${p.reason === 'othermed' ? '' : `<label class="f">Reason<select id="lg-reason">${REASON_CHOICES.map(k => `<option value="${k}" ${reasonOf() === k ? 'selected' : ''}>${REASONS[k]}</option>`).join('')}</select></label>`}
+        </details>
+        <div id="lg-err"></div><div id="lg-warn"></div>
+        <div class="sheet-actions"><button class="primary" id="lg-save">Save</button></div>` : '<div class="empty">Pick what you took.</div>'}`);
+    sh.el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { sync(); lg.key = b.dataset.k; lg.reason = null; draw(); });
+    ['lg-amt', 'lg-note', 'lg-date', 'lg-reason'].forEach(id => { const el = sh.el.querySelector('#' + id); if (el) el.oninput = () => { sync(); const e = sh.el.querySelector('#lg-err'); if (e) e.innerHTML = ''; updateWarn(); }; });
+    const ns = sh.el.querySelector('#lg-noslept');
+    if (ns) ns.onchange = () => { sync(); lg.noSleep = ns.checked; lg.more = true; lg.date = ns.checked ? addDays(ymd(new Date()), -1) : today; draw(); };
+    const sv = sh.el.querySelector('#lg-save');
+    if (sv) sv.onclick = save_;
+    updateWarn();
+  };
+  const save_ = () => {
+    sync();
+    const d = doseOf(), r = reasonOf();
+    if (!(d > 0)) return err('Enter an amount in mg.');
+    if (!lg.date) return err('Pick a date.');
+    if (lg.date > ymd(new Date())) return err('That date is in the future.');
+    if (r === 'othermed') {
+      if (!lg.note.trim()) return err('Type the medication name.');
+      const id = addEntry({ date: lg.date, dose: 0, reason: 'othermed', note: `${num(d)} mg ${lg.note.trim()}` });
+      sh.close(); buzz(); showToast(`Saved note: ${num(d)} mg ${lg.note.trim()}`, () => removeEntry(id));
+      return;
+    }
+    const date = lg.date;
+    const id = addEntry({ date, dose: d, reason: r, note: lg.note.trim() });
+    sh.close(); buzz();
+    showToast(`Saved: ${mg(d)}${date !== today ? ' on ' + fmt(date) : ' today'}`, () => removeEntry(id));
+  };
+  draw();
+  return sh;
+}
+
+// ---------- day sheet: see, add, edit, delete ----------
+function planLabel(date) {
+  const today = logicalToday();
+  if (date > today) {
+    const pr = projection(today, diffDays(today, date) + 1);
+    return date in pr ? (pr[date] ? 'Planned: 0.125 mg' : 'Planned: off day') : '';
+  }
+  const p = planFor(date);
+  if (!p || p.kind === 'before') return '';
+  return p.kind === 'due' ? (p.head.includes(' or ') ? 'Plan: 0.125 or off' : 'Plan: 0.125 mg') : 'Plan: off day';
+}
+function entryParts(e) {
   const dt = new Date(e.at);
-  const t = e.reason === 'backfill' || isNaN(dt) ? '' : ' · ' + dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const reason = e.reason === 'backfill' ? 'backfilled' : REASONS[e.reason] || e.reason;
-  const what = e.dose > 0 ? `${mg(e.dose)} · ${esc(reason)}${e.note ? ' · ' + esc(e.note) : ''}` : e.note ? `Note: ${esc(e.note)}` : 'Off day confirmed';
-  return `<div class="entry">${what}${t}
-    <button data-del="${e.id}">delete</button></div>`;
+  const t = e.reason === 'backfill' || isNaN(dt) ? '' : dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const reason = e.reason === 'backfill' ? 'Backfilled' : REASONS[e.reason] || e.reason;
+  if (e.dose > 0) return { main: mg(e.dose), sub: [reason, e.note, t && 'logged ' + t].filter(Boolean).join(' · ') };
+  if (e.reason === 'othermed') return { main: e.note || 'Other medication', sub: 'Other medication, not counted' + (t ? ' · logged ' + t : '') };
+  return { main: 'Off day confirmed', sub: t ? 'logged ' + t : '' };
 }
-function bindDeletes() {
-  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
-    if (!confirm('Delete this entry?')) return;
-    S.entries = S.entries.filter(e => e.id !== b.dataset.del); save(); render();
-  });
+function entryHtml(e) {
+  const { main, sub } = entryParts(e);
+  return `<div class="entry"><b style="color:var(--text)">${esc(main)}</b>${sub ? ' · ' + esc(sub) : ''}</div>`;
 }
+function openDay(startDate) {
+  let date = startDate;
+  const sh = makeSheet('');
+  const draw = () => {
+    if (!sh.open) return;
+    const today = logicalToday(), future = date > today;
+    const info = dayInfo(date);
+    const total = info.entries.length ? (info.total > EPS ? mg(info.total) : 'No dose') : 'Not logged';
+    const plan = planLabel(date);
+    const fl = S.checkins[date];
+    sh.set(`
+      <div class="sheet-title">${fmt(date)}${date === today ? ' (today)' : ''}</div>
+      <div class="sheet-sub">${future ? '' : total + (plan ? ' · ' : '')}${plan}</div>
+      ${info.entries.map(e => { const { main, sub } = entryParts(e); return `<button class="entry-line" data-edit="${e.id}"><span>${esc(main)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><span class="chev-r">›</span></button>`; }).join('')}
+      ${!info.entries.length && !future ? '<div class="empty">Nothing logged for this day.</div>' : ''}
+      ${future ? '' : `
+        <div class="label section-label">How did you feel?</div>
+        <div class="seg">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${k} ${fl === k ? 'sel' : ''}" data-dfeel="${k}">${FACE[k]}${v}</button>`).join('')}</div>
+        <div class="sheet-actions">
+          <button class="primary" id="d-add">Add entry</button>
+          ${info.entries.length ? '' : '<button class="secondary wide" id="d-off">Mark as off day</button>'}
+        </div>`}`);
+    sh.el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => drawEdit(b.dataset.edit));
+    sh.el.querySelectorAll('[data-dfeel]').forEach(b => b.onclick = () => {
+      const k = b.dataset.dfeel;
+      if (S.checkins[date] === k) delete S.checkins[date]; else S.checkins[date] = k;
+      buzz(8); save(); render(); draw();
+    });
+    const add = sh.el.querySelector('#d-add'); if (add) add.onclick = () => { const d = date; sh.close(); openLog({ date: d }); };
+    const off = sh.el.querySelector('#d-off'); if (off) off.onclick = () => { saveOff(date); draw(); };
+  };
+  const drawEdit = id => {
+    const e = S.entries.find(x => x.id === id);
+    if (!e) return draw();
+    const isOff = e.reason === 'off', isOther = e.reason === 'othermed';
+    sh.set(`
+      <div class="sheet-title">Edit entry</div><div class="sheet-sub">${fmt(e.date)}</div>
+      ${isOff ? '<div class="empty">Off day confirmed. You can remove it.</div>' : `
+        ${isOther ? '' : `<label class="f">Amount (mg)<input id="ed-dose" type="number" inputmode="decimal" step="0.0625" min="0" value="${e.dose}"></label>`}
+        <label class="f">${isOther ? 'Medication and amount' : 'Note'}<input id="ed-note" value="${esc(e.note || '')}"></label>
+        ${isOther ? '' : `<label class="f">Reason<select id="ed-reason">${Object.entries(REASONS).filter(([k]) => k !== 'off' && k !== 'othermed').map(([k, v]) => `<option value="${k}" ${e.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`}
+        <label class="f">Date<input id="ed-date" type="date" value="${e.date}" max="${ymd(new Date())}"></label>`}
+      <div id="ed-err"></div>
+      <div class="sheet-actions">
+        ${isOff ? '' : '<button class="primary" id="ed-save">Save changes</button>'}
+        <button class="danger-text" id="ed-del">Delete entry</button>
+        <button class="secondary wide" id="ed-back">Back</button>
+      </div>`);
+    const g = x => sh.el.querySelector('#' + x);
+    g('ed-back').onclick = draw;
+    g('ed-del').onclick = () => {
+      const removed = { ...e };
+      S.entries = S.entries.filter(x => x.id !== id); save(); render(); buzz();
+      showToast('Entry deleted', () => { S.entries.push(removed); sortEntries(); save(); render(); draw(); });
+      draw();
+    };
+    if (g('ed-save')) g('ed-save').onclick = () => {
+      const dose = isOther ? 0 : parseFloat(g('ed-dose').value);
+      const nd = g('ed-date').value;
+      const fail = t => { g('ed-err').innerHTML = noteHtml({ cls: 'bad', t }); };
+      if (!isOther && !(dose >= 0)) return fail('Enter an amount in mg (0 is allowed).');
+      if (!nd) return fail('Pick a date.');
+      if (nd > ymd(new Date())) return fail('That date is in the future.');
+      e.dose = dose; e.note = g('ed-note').value.trim(); e.date = nd;
+      if (!isOther) e.reason = g('ed-reason').value;
+      date = nd; sortEntries(); save(); render(); buzz(); showToast('Entry updated'); draw();
+    };
+  };
+  draw();
+  return sh;
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-day]');
+  if (t && !e.target.closest('.sheet')) openDay(t.dataset.day);
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.day-row[data-day]')) { e.preventDefault(); openDay(e.target.dataset.day); }
+});
 function firstLogged() { return S.entries.length ? S.entries[0].date : null; }
 function pillHtml(total, hasEntries, date) {
   const f = firstLogged();
@@ -711,7 +955,7 @@ function renderHistory() {
     if (d > today) { cal += '<div></div>'; continue; }
     const t = dayInfo(d).total;
     const cls = t > 0.375 + EPS ? 'over' : t >= 0.25 - EPS ? 'high' : t > EPS ? 'bridge' : '';
-    cal += `<div class="c ${cls} ${d === today ? 'today' : ''}">${parse(d).getDate()}</div>`;
+    cal += `<button class="c ${cls} ${d === today ? 'today' : ''}" data-day="${d}" aria-label="${fmt(d)}">${parse(d).getDate()}</button>`;
   }
   cal += '</div>';
   // list grouped by week, newest first
@@ -723,7 +967,7 @@ function renderHistory() {
       if (d > today || d < start) continue;
       const info = dayInfo(d); total += info.total;
       const fl = S.checkins[d];
-      rows += `<div class="day-row"><div class="day-num"><b>${parse(d).getDate()}</b><span>${parse(d).toLocaleDateString(undefined, { weekday: 'short' })}</span></div>
+      rows += `<div class="day-row" data-day="${d}" role="button" tabindex="0"><div class="day-num"><b>${parse(d).getDate()}</b><span>${parse(d).toLocaleDateString(undefined, { weekday: 'short' })}</span></div>
         <div class="day-body">${fl ? `<span class="feel-tag ${fl}" style="margin-left:0">felt ${FEELINGS[fl].toLowerCase()}</span>` : ''}${info.entries.map(entryHtml).join('') || (!f || d < f ? '<span class="entry">not logged</span>' : '<span class="entry">no entries</span>')}</div>
         ${pillHtml(info.total, info.entries.length > 0, d)}</div>`;
     }
@@ -738,7 +982,6 @@ function renderHistory() {
     <button class="primary" id="copy-hist" style="margin-top:0">Copy log</button>
     ${list || '<p class="plan-text">Nothing logged yet.</p>'}`;
   $('#copy-hist').onclick = copyLog;
-  bindDeletes();
 }
 
 // ---------- weekly chart ----------
@@ -868,15 +1111,17 @@ function renderTrends() {
     document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));
     $('#wk-readout').innerHTML = weekReadout(weeks[+h.dataset.wk]);
   });
-  if ($('#widen')) $('#widen').onclick = () => {
-    const msg = (widenWarn.length ? 'Heads up:\n\n• ' + widenWarn.join('\n• ') + '\n\n' : '') + `Move to ${intervalName(next)} starting today?`;
-    if (!confirm(msg)) return;
+  if ($('#widen')) $('#widen').onclick = async () => {
+    const ok = await askConfirm({ title: `Move to ${intervalName(next)}?`, sub: 'Starting today. Only widen if off days have felt fine.', lines: widenWarn, ok: 'Move' });
+    if (!ok) return;
     S.settings.intervals = S.settings.intervals.filter(i => i.from !== today);
-    S.settings.intervals.push({ from: today, every: next }); save(); render();
+    S.settings.intervals.push({ from: today, every: next }); save(); render(); buzz();
+    showToast(`Interval: ${intervalName(next)}`);
   };
-  if ($('#undo-widen')) $('#undo-widen').onclick = () => {
-    if (!confirm('Go back to the previous interval?')) return;
+  if ($('#undo-widen')) $('#undo-widen').onclick = async () => {
+    if (!await askConfirm({ title: 'Go back to the previous interval?', ok: 'Go back' })) return;
     S.settings.intervals.sort((a, b) => a.from.localeCompare(b.from)).pop(); save(); render();
+    showToast('Interval changed back');
   };
 }
 
@@ -934,7 +1179,7 @@ function renderSettings() {
   $('#file').onchange = restore;
   $('#s-save').onclick = () => {
     const start = $('#s-start').value;
-    if (!start) return alert('Bridge start date is required.');
+    if (!start) return showToast('Bridge start date is required.');
     st.medName = $('#s-name').value.trim() || 'My medicine';
     if (start !== st.startDate) {
       st.intervals = st.intervals.filter(i => i.from > start);
@@ -947,12 +1192,12 @@ function renderSettings() {
       st.intervals = st.intervals.filter(i => i.from !== from);
       st.intervals.push({ from, every });
     }
-    save(); alert('Saved.'); render();
+    save(); render(); showToast('Settings saved');
   };
-  $('#wipe').onclick = () => {
-    if (!confirm('Erase every entry and setting on this phone? Make a backup first.')) return;
-    if (!confirm('Really erase? This cannot be undone.')) return;
-    localStorage.removeItem(KEY); S = load(); tab = 'today'; render();
+  $('#wipe').onclick = async () => {
+    if (!await askConfirm({ title: 'Erase everything?', sub: 'Every entry and setting on this phone will be deleted. Make a backup first.', ok: 'Continue', danger: true })) return;
+    if (!await askConfirm({ title: 'Really erase?', sub: 'This cannot be undone.', ok: 'Erase all data', danger: true })) return;
+    localStorage.removeItem(KEY); S = load(); tab = 'today'; render(); showToast('All data erased');
   };
 }
 
@@ -1006,7 +1251,7 @@ function logText() {
 }
 async function copyLog() {
   const t = logText();
-  try { await navigator.clipboard.writeText(t); alert('Copied. Paste it into your chat or note.'); }
+  try { await navigator.clipboard.writeText(t); buzz(); showToast('Copied. Paste it into your chat or note.'); }
   catch (e) { shareOrDownload(`dose-log-${logicalToday()}.txt`, t, 'text/plain'); }
 }
 function exportCsv() {
@@ -1018,20 +1263,22 @@ function exportCsv() {
 function restore(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
-  r.onload = () => {
+  r.onload = async () => {
     try {
       const j = JSON.parse(r.result);
       const data = j.data || j;
       if (!Array.isArray(data.entries) || !data.settings) throw new Error('Not a Dose Log backup file.');
-      if (!confirm(`Replace what's on this phone with the backup from ${j.exportedAt ? fmt(j.exportedAt.slice(0, 10)) : 'file'} (${data.entries.length} entries)?`)) return;
-      S = migrate(data); save(); tab = 'today'; render(); alert('Restored.');
-    } catch (e) { alert('Could not restore: ' + e.message); }
+      const ok = await askConfirm({ title: 'Replace the log on this phone?', sub: `Backup from ${j.exportedAt ? fmt(j.exportedAt.slice(0, 10)) : 'the file'} with ${data.entries.length} entries replaces what is here now.`, ok: 'Replace', danger: true });
+      if (!ok) return;
+      S = migrate(data); save(); tab = 'today'; render(); showToast('Restored');
+    } catch (e) { showToast('Could not restore: ' + e.message); }
   };
   r.readAsText(f);
+  ev.target.value = '';
 }
 
 // ---------- import link (#import=<base64url JSON [[date, dose, reason, note], ...]>) ----------
-function importFromHash() {
+async function importFromHash() {
   const m = location.hash.match(/^#import=([A-Za-z0-9_-]+)$/);
   if (!m) return;
   history.replaceState(null, '', location.pathname + location.search);
@@ -1039,30 +1286,48 @@ function importFromHash() {
   try {
     rows = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
     if (!Array.isArray(rows) || !rows.every(r => /^\d{4}-\d{2}-\d{2}$/.test(r[0]) && r[1] >= 0)) throw new Error('bad data');
-  } catch (e) { alert('That import link is not valid.'); return; }
-  S = load(); // latest saved data, in case another tab or the installed app changed it
-  const dup = r => S.entries.some(e => e.date === r[0] && Math.abs(e.dose - r[1]) < EPS && (e.note || '') === (r[3] || ''));
-  const fresh = rows.filter(r => !dup(r));
-  if (!fresh.length) { alert('Those entries are already in your log.'); return; }
-  const list = fresh.map(r => `${r[0]}: ${r[1] > 0 ? r[1] + ' mg' : 'off'}`).join('\n');
-  if (!confirm(`Add ${fresh.length} entries to your log?\n\n${list}`)) return;
+  } catch (e) { showToast('That import link is not valid.'); return; }
+  const fresh = () => { S = load(); return rows.filter(r => !S.entries.some(e => e.date === r[0] && Math.abs(e.dose - r[1]) < EPS && (e.note || '') === (r[3] || ''))); };
+  const first = fresh();
+  if (!first.length) { showToast('Those entries are already in your log.'); return; }
+  const ok = await askConfirm({ title: `Add ${first.length} entr${first.length === 1 ? 'y' : 'ies'} to your log?`, items: first.map(r => `${fmt(r[0])}: ${r[1] > 0 ? r[1] + ' mg' : (r[3] || 'off')}`), ok: 'Add' });
+  if (!ok) return;
+  const list = fresh(); // latest saved data, in case anything changed while the sheet was open
   const now = new Date().toISOString();
-  fresh.forEach((r, i) => S.entries.push({ id: Date.now().toString(36) + i, at: now, date: r[0], dose: +r[1], reason: r[2] || 'other', note: r[3] || '' }));
-  S.entries.sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
-  save(); alert(`Added ${fresh.length} entries.`);
+  list.forEach((r, i) => S.entries.push({ id: Date.now().toString(36) + i, at: now, date: r[0], dose: +r[1], reason: r[2] || 'other', note: r[3] || '' }));
+  sortEntries(); save(); render(); showToast(`Added ${list.length} entr${list.length === 1 ? 'y' : 'ies'}`);
+}
+
+// ---------- launch shortcuts (long-press the app icon) ----------
+async function handleLaunchAction() {
+  const action = new URLSearchParams(location.search).get('action');
+  if (!action) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (!S.settings.startDate) return;
+  tab = 'today'; render();
+  const today = logicalToday();
+  if (action === 'sos') { openLog({ preset: 'sos' }); return; }
+  if (dayInfo(today).entries.length) { showToast('Already logged today. Tap the day to edit.'); return; }
+  if (action === 'take') {
+    const p = planFor(today);
+    await takeBridge(today, p && p.text.includes('(late)') ? 'late' : 'scheduled', { forceConfirm: true, sub: p ? p.text : '' });
+  } else if (action === 'off') {
+    if (await askConfirm({ title: 'Confirm today as an off day?', ok: 'Confirm' })) saveOff(today);
+  }
 }
 
 // ---------- boot ----------
-document.querySelectorAll('nav button').forEach(b => b.onclick = () => { tab = b.dataset.tab; form = { dose: null, reason: 'scheduled' }; render(); });
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
 // Reload saved data whenever the app comes back to the front or another tab saves,
 // so a stale copy in memory never overwrites newer entries.
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { S = load(); render(); } });
 window.addEventListener('storage', e => { if (e.key === KEY) { S = load(); render(); } });
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-importFromHash();
 window.addEventListener('hashchange', () => { importFromHash(); render(); });
 render();
+importFromHash();
+handleLaunchAction();
 </script>
 </body>
 </html>
