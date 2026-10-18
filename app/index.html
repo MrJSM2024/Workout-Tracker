@@ -137,7 +137,7 @@
   .banner button { border: 0; background: var(--warn); color: var(--card); border-radius: 10px; padding: 8px 12px; font-weight: 800; font-size: 13px; }
 
   /* toast */
-  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto;
+  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(150px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto;
     background: var(--text); color: var(--card); border-radius: 16px; padding: 14px 16px; display: flex; justify-content: space-between;
     align-items: center; gap: 10px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 200;
     opacity: 0; transform: translateY(14px); pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.85,.25,1); }
@@ -302,6 +302,70 @@
   .rangebar { display: flex; gap: 6px; margin-top: 10px; }
   .rng { flex: 1; padding: 8px 4px; border: 0; border-radius: 10px; background: var(--raised); color: var(--muted); font-weight: 700; font-size: 13px; }
   .rng.sel { background: var(--accent-soft); color: var(--accent); }
+  /* pattern chains */
+  .chain { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 2px; margin-top: 14px; }
+  .pchip { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 46px; background: none; border: 0; padding: 0; color: inherit; font: inherit; }
+  .pchip .pc { width: 44px; height: 44px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; letter-spacing: -.02em; line-height: 1; box-sizing: border-box; }
+  .pc small { font-size: 8.5px; font-weight: 700; margin-top: 2px; letter-spacing: 0; }
+  .pc.bridge { background: var(--c-bridge); color: #fff; }
+  .pc.high { background: var(--c-high); color: #fff; }
+  .pc.vhigh { background: var(--bad); color: #fff; }
+  .pc.off { border: 2px solid var(--line); color: var(--muted); font-weight: 700; font-size: 12px; }
+  .pc.note { border-style: dotted; font-size: 11px; }
+  .pc.or { border: 2px dashed var(--c-bridge); color: var(--c-bridge); }
+  .pc.missed { border: 2px dashed var(--bad); color: var(--bad); font-size: 10px; }
+  .pc.unl { border: 2px dashed var(--warn); color: var(--warn); }
+  .planned .pc.bridge { background: transparent; border: 2px dashed var(--c-bridge); color: var(--c-bridge); }
+  .planned .pc.off { border-style: dashed; }
+  .pchip .cap { font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .pchip.today .pc { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--text); }
+  .pchip.today .cap { color: var(--text); font-weight: 800; }
+  button.pchip:active { transform: scale(.94); }
+  .arrow { height: 44px; display: flex; align-items: center; color: var(--faint); padding: 0 1px; }
+  .hero .chain { border-top: 1px solid rgba(127,127,127,.2); padding-top: 16px; margin-top: 18px; }
+  .hero-legend { font-size: 11px; opacity: .7; margin-top: 10px; text-align: center; }
+  .hero.dose .pc.off { border-color: rgba(255,255,255,.55); color: rgba(255,255,255,.9); }
+  .hero.dose .planned .pc.bridge { border-color: #fff; color: #fff; }
+  .hero.dose .pc.bridge, .hero.dose .pc.high, .hero.dose .pc.vhigh { box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
+  .hero.dose .pchip.today .pc { box-shadow: 0 0 0 3px #17603c, 0 0 0 5px #fff; }
+  .hero.dose .pchip .cap, .hero.dose .arrow { color: rgba(255,255,255,.85); }
+  .hero.off .pchip.today .pc, .hero.done .pchip.today .pc { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--text); }
+  /* plan tab */
+  .section-h { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 26px 6px 2px; }
+  .pnote { font-size: 13px; color: var(--muted); margin-top: 10px; padding-left: 12px; border-left: 3px solid var(--line); }
+  .keyrow { display: flex; align-items: center; gap: 14px; padding: 8px 0; font-size: 14px; }
+  .keyrow .pchip .cap { display: none; }
+  .ladder { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .ladder:last-child { border-bottom: 0; }
+  .ladder .lh { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ladder.cur .lh b { color: var(--accent); }
+  .here { font-size: 11px; font-weight: 800; color: var(--on-accent); background: var(--accent); padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+  .rule { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .rule:last-child { border-bottom: 0; }
+  .rule .ic { flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; background: var(--bad-soft); color: var(--bad); }
+  .rule .ic.w { background: var(--warn-soft); color: var(--warn); }
+  /* floating log button */
+  .fab { position: fixed; right: max(16px, calc(50vw - 264px)); bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 6; display: flex; align-items: center; gap: 6px;
+    padding: 14px 20px 14px 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  /* trends dashboard */
+  .status { border-radius: 18px; padding: 14px 16px; margin: 14px 0; }
+  .status b { display: block; font-size: 16px; }
+  .status span { font-size: 13px; }
+  .status.ok { background: var(--accent-soft); color: var(--accent); }
+  .status.bad { background: var(--bad-soft); color: var(--bad); }
+  .tiles4 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  .tiles4 small.delta { display: block; font-size: 12px; color: var(--muted); font-weight: 700; margin-top: 3px; }
+  .dgrid { display: grid; grid-template-columns: 44px repeat(7, 1fr); gap: 4px; margin-top: 12px; align-items: center; }
+  .dgrid .h { font-size: 10px; color: var(--faint); text-align: center; font-weight: 700; }
+  .dgrid .wl { font-size: 10px; color: var(--faint); font-weight: 600; white-space: nowrap; }
+  .dc { aspect-ratio: 1; border: 0; border-radius: 6px; background: var(--raised); position: relative; padding: 0; box-shadow: inset 0 0 0 1px var(--line); }
+  .dc.bridge { background: var(--c-bridge); box-shadow: none; }
+  .dc.high { background: var(--c-high); box-shadow: none; }
+  .dc.vhigh { background: var(--bad); box-shadow: none; }
+  .dc.gap { background: transparent; box-shadow: none; outline: 1.5px dashed var(--warn); outline-offset: -2px; }
+  .dc.none { background: transparent; box-shadow: none; }
+  .dc.today { outline: 2px solid var(--text); outline-offset: 1px; }
+  .dc i { position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 1.5px var(--card); }
 </style>
 </head>
 <body>
@@ -315,6 +379,7 @@
   <button data-tab="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/></svg>Today</button>
   <button data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>History</button>
   <button data-tab="trends"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Trends</button>
+  <button data-tab="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.5 6H15a3.5 3.5 0 0 1 0 7H9a3.5 3.5 0 0 0 0 7h7.5"/></svg>Plan</button>
   <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
 </nav>
 
@@ -334,15 +399,15 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-18b';
+const APP_VERSION = '2026-10-18c';
 const PRESETS = {
-  bridge:   { label: '0.125', sub: 'Bridge dose', dose: 0.125, reason: 'scheduled' },
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
   late:     { label: '0.125', sub: 'Late dose', dose: 0.125, reason: 'late' },
-  tremor:   { label: '0.125', sub: 'Tremor or tingling', dose: 0.125, reason: 'tremor' },
+  bridge:   { label: '0.125', sub: 'Bridge dose', dose: 0.125, reason: 'scheduled' },
   othermed: { label: 'Other med', sub: 'Note only, not counted', dose: null, reason: 'othermed', amount: true, name: true },
   custom:   { label: 'Other', sub: 'Different amount', dose: null, reason: 'other', amount: true },
+  tremor:   { label: '0.125', sub: 'Tremor or tingling', dose: 0.125, reason: 'tremor' },
 };
 const sortEntries = () => S.entries.sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
 const SYMPTOM_TAGS = ['Poor sleep', 'Anxiety', 'Hard day ahead'];
@@ -374,6 +439,7 @@ const ICON = {
   csv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>',
   restore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
   chev: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  plus: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   checkAnim: '<svg class="tcheck" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
   check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
 };
@@ -593,13 +659,13 @@ let chartWeeks = 16, histAll = false;
 let justSaved = false;
 
 function render() {
-  $('#title').textContent = { today: 'Today', history: 'History', trends: 'Trends', settings: 'Settings' }[tab];
+  $('#title').textContent = { today: 'Today', history: 'History', trends: 'Trends', plan: 'Plan', settings: 'Settings' }[tab];
   $('#eyebrow').textContent = `${S.settings.medName || 'Dose Log'} · ${fmt(logicalToday())}`;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const app = $('#app');
   if (tab !== lastTab) { app.classList.remove('view-in'); void app.offsetWidth; app.classList.add('view-in'); if (lastTab) window.scrollTo(0, 0); lastTab = tab; }
   if (!S.settings.startDate) { renderSetup(); justSaved = false; return; }
-  ({ today: renderToday, history: renderHistory, trends: renderTrends, settings: renderSettings })[tab]();
+  ({ today: renderToday, history: renderHistory, trends: renderTrends, plan: renderPlan, settings: renderSettings })[tab]();
   justSaved = false;
 }
 
@@ -657,6 +723,139 @@ function timelineHtml(today) {
   }
   return h + `</div><div class="tl-legend"><span><i style="background:var(--c-bridge)"></i>0.125</span><span><i style="background:var(--c-high)"></i>0.25+</span><span><i style="border:1.5px dashed currentColor"></i>planned</span><span>tap a day</span></div>`;
 }
+// ---------- pattern chains ----------
+const ARROW = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+function chipHtml(c) {
+  let cls, lab;
+  if (c.missed) { cls = 'missed'; lab = 'missed'; }
+  else if (c.unlogged) { cls = 'unl'; lab = '?'; }
+  else if (c.or) { cls = 'or'; lab = '0.125<small>or off</small>'; }
+  else if (c.note && !(c.dose > EPS)) { cls = 'off note'; lab = 'note'; }
+  else { const t = dayType(c.dose || 0); cls = t; lab = t === 'off' ? 'off' : num(c.dose); }
+  const k = `pchip${c.planned ? ' planned' : ''}${c.today ? ' today' : ''}`;
+  const inner = `<span class="pc ${cls}">${lab}</span><span class="cap">${esc(c.cap || '')}</span>`;
+  return c.date ? `<button class="${k}" data-day="${c.date}" aria-label="${fmt(c.date)}">${inner}</button>` : `<div class="${k}">${inner}</div>`;
+}
+// Runs of 4+ plain off days collapse into one "off ×N" chip so weekly steps stay readable.
+function compressOff(chips) {
+  const out = []; let run = [];
+  const plain = c => !(c.dose > EPS) && !c.today && !c.missed && !c.unlogged && !c.or && !c.note;
+  const flush = () => { if (run.length >= 4) out.push({ dose: 0, cap: `×${run.length} days`, planned: run.every(c => c.planned) }); else out.push(...run); run = []; };
+  chips.forEach(c => { if (plain(c)) run.push(c); else { flush(); out.push(c); } });
+  flush();
+  return out;
+}
+const chainHtml = chips => `<div class="chain">${compressOff(chips).map(chipHtml).join(`<span class="arrow">${ARROW}</span>`)}</div>`;
+// The cycle you are in: from the last dose (whole high run) to the next 0.125, with today marked.
+function currentCycle(today) {
+  const anchor = inPlan(today) && dayInfo(today).total > EPS ? today : lastDosedBefore(today);
+  if (!anchor) return null;
+  let start = anchor;
+  if (isHigh(planDay(anchor).type)) while (isHigh(planDay(addDays(start, -1)).type)) start = addDays(start, -1);
+  const proj = projection(today, 16), orToday = planFor(today).head.includes(' or ');
+  const chips = [];
+  for (let d = start, i = 0; i < 18; d = addDays(d, 1), i++) {
+    const di = dayInfo(d), cap = d === today ? 'Today' : parse(d).toLocaleDateString(undefined, { weekday: 'short' });
+    let c;
+    if (di.entries.length) c = { dose: di.total, note: di.entries.some(e => e.reason === 'othermed') };
+    else if (d < today) c = { unlogged: true };
+    else if (d in proj) c = { dose: proj[d], planned: true, or: d === today && proj[d] > EPS && orToday };
+    else break;
+    chips.push({ ...c, date: d, cap, today: d === today });
+    if (d > anchor && c.dose > EPS && !isHigh(dayType(c.dose))) break;
+  }
+  return chips;
+}
+// Runs the real rules on a blank, simulated log so the Plan tab always matches the engine.
+function simulatePattern(forced, { every = 2, cycles = 1 } = {}) {
+  const real = S, base = '2031-01-06';
+  S = { entries: [], checkins: {}, symptoms: {}, skipped: {}, settings: { ...real.settings, startDate: base, intervals: [{ from: base, every }] } };
+  try {
+    const chips = []; let d = base, n = 0;
+    for (const f of forced) {
+      if (f.dose > EPS || f.reason === 'othermed') S.entries.push({ id: 'sim' + n, at: '', date: d, dose: f.dose, reason: f.reason || (f.dose > 0.2 ? 'sos' : 'scheduled'), note: f.note || '' });
+      chips.push({ dose: f.dose, missed: f.missed, note: f.reason === 'othermed', cap: f.cap || '' });
+      d = addDays(d, 1); n++;
+    }
+    for (let c = 0; c < cycles; c++) {
+      for (let k = 0; k < 20; k++) {
+        const p = planFor(d);
+        if (p.kind === 'due') {
+          const or = p.head.includes(' or ');
+          chips.push({ dose: 0.125, or, cap: or ? 'your call' : p.late ? 'late' : '' });
+          S.entries.push({ id: 'simd' + n, at: '', date: d, dose: 0.125, reason: p.late ? 'late' : 'scheduled', note: '' });
+          d = addDays(d, 1); n++;
+          break;
+        }
+        chips.push({ dose: 0 });
+        d = addDays(d, 1); n++;
+      }
+    }
+    return chips;
+  } finally { S = real; }
+}
+const capFirst = t => t.charAt(0).toUpperCase() + t.slice(1);
+function renderPlan() {
+  const today = logicalToday(), p = planFor(today), every = intervalOn(today);
+  const cyc = currentCycle(today);
+  const H = cap => ({ dose: 0.25, reason: 'sos', cap }), OFF = { dose: 0 }, B = { dose: 0.125 };
+  const card = (title, when, chips, notes = []) => `<div class="card pcard"><div class="card-title">${title}</div>${when ? `<div class="entry">${when}</div>` : ''}${chainHtml(chips)}${notes.map(t => `<div class="pnote">${esc(t)}</div>`).join('')}</div>`;
+  const ex = every > 2 ? every : 4;
+  const rule = (t, w) => `<div class="rule"><span class="ic ${w ? 'w' : ''}">!</span><span>${t}</span></div>`;
+  const headline = p.kind === 'due' ? (p.head.includes(' or ') ? '0.125 or off today' : '0.125 today') : p.kind === 'off' ? 'Off day today' : `Plan starts ${fmt(S.settings.startDate)}`;
+  $('#app').innerHTML = `
+  <section class="card now">
+    <div class="label">Where you are now</div>
+    <div class="card-title" style="margin-top:4px">${headline}</div>
+    <div class="entry">${esc(p.text)}</div>
+    ${cyc ? chainHtml(cyc) : ''}
+    <div class="legend"><span><i style="background:var(--c-bridge)"></i>0.125</span><span><i style="background:var(--c-high)"></i>0.25+</span><span><i style="background:var(--bad)"></i>0.5+</span><span><i style="border:1.5px dashed var(--muted)"></i>planned</span></div>
+  </section>
+  <div class="card">
+    <div class="card-title">Key idea</div>
+    <div class="keyrow">${chipHtml({ dose: 0.25 })}<span><b>0.25 = SOS.</b> Only for genuinely acute stress.</span></div>
+    <div class="keyrow">${chipHtml({ dose: 0.125 })}<span><b>0.125 = bridge.</b> Low dose that keeps the taper smooth.</span></div>
+    <div class="keyrow">${chipHtml({ dose: 0 })}<span><b>Off = medication-free.</b> Lets the residual drug come down.</span></div>
+  </div>
+  <div class="section-h">Patterns</div>
+  ${card('Normal', 'No hard days: a 0.125 bridge, an off day, repeat.', simulatePattern([B], { every: 2, cycles: 2 }))}
+  ${card('Hard day', 'Acute stress: 0.25, two off days, then back to 0.125.', simulatePattern([H('SOS')]))}
+  ${card('Hard 2 days', 'Same stress the next day: 0.25 again, then two off days.', simulatePattern([H('SOS'), H('SOS')]))}
+  ${card('Hard 3 days, same emergency', 'Three days of 0.25 at most.', simulatePattern([H('SOS'), H('SOS'), H('SOS')]), ['No 4th day of 0.25. If the emergency is still going on day 4, get medical advice.', `From ${fmt(unlockSkip3())}, if off days have felt fine and no tremor dose in 14 days: 3 off days is OK.`])}
+  ${card('Hard day during the off days', 'The new 0.25 restarts the count.', simulatePattern([H('SOS'), OFF, H('SOS')]))}
+  ${card('Hard day on a 0.125 day', 'Take 0.25 instead, not both. Already took the 0.125? Add 0.125 more (total 0.25).', simulatePattern([H('instead')]))}
+  ${card("Can't sleep, no dose yet today", 'Acute stress keeping you up: 0.25 at night.', simulatePattern([{ dose: 0.25, reason: 'sleep', cap: 'night' }]), ["Until you've slept, it's still the same day (before 6 AM counts as the day before).", 'Not two nights in a row. Max twice in 30 days.'])}
+  ${card("Can't sleep, took 0.125 this morning", '0.25 at night, total 0.375 for the day.', simulatePattern([{ dose: 0.375, reason: 'sleep', cap: '0.125 + 0.25' }]))}
+  ${card("Can't sleep, took 0.25 this morning", 'Not part of the plan. If it happens anyway (total 0.5): skip 3 days.', simulatePattern([{ dose: 0.5, reason: 'sleep', cap: '0.25 + 0.25' }]))}
+  ${card('Missed a 0.125', 'Take it when you remember, same day or next. The count restarts from that day. Never double up.', simulatePattern([B, OFF, { dose: 0, missed: true }], { cycles: 2 }))}
+  ${card('Tremor, tingling or twitching', 'On an off day with no stressful trigger: 0.125, unless there was any dose yesterday. It restarts the count.', simulatePattern([H('SOS'), OFF, { dose: 0.125, reason: 'tremor', cap: 'tremor' }]))}
+  ${card('Other medication day', 'Logged as a note, not counted. The next due day is your call: 0.125 or off.', simulatePattern([B, { dose: 0, reason: 'othermed', note: 'other medication', cap: 'other med' }]))}
+  <div class="section-h">Widening ladder</div>
+  <div class="card">
+    <div class="entry">One step at a time, only when off days have felt fine for 2 weeks. Hold each step at least 14 days. Earliest first widening: ${fmt(widenEarliest())}. High days never change the step.</div>
+    ${[2, 3, 4, 7].map(n => `<div class="ladder ${n === every ? 'cur' : ''}"><div class="lh"><b>${capFirst(intervalName(n))}</b>${n === every ? '<span class="here">You are here</span>' : ''}</div>${chainHtml(simulatePattern([B], { every: n }))}</div>`).join('')}
+    <div class="ladder ${every === 0 ? 'cur' : ''}"><div class="lh"><b>None</b>${every === 0 ? '<span class="here">You are here</span>' : ''}</div><div class="entry" style="margin-top:6px">No scheduled doses. A hard day is followed only by off days.</div></div>
+  </div>
+  ${card(`Hard day at ${intervalName(ex)}`, `0.25, then off for 2 days or your current interval, whichever is longer, then 0.125.${every > 2 ? '' : ' (Example for when you widen.)'}`, simulatePattern([H('SOS')], { every: ex }))}
+  <div class="section-h">Hard limits</div>
+  <div class="card">
+    ${rule('Never above 0.25 in a day. Exception: 0.375 when the extra 0.25 is at night for sleep.')}
+    ${rule('Never 0.125 two days in a row.')}
+    ${rule('No 4th high day in a row. If the emergency is still going on, get medical advice.')}
+    ${rule('Sleep exception: not two nights in a row, and no more than twice in 30 days.')}
+    ${rule('0.25 only for genuinely acute stress, not an ordinary difficult day.')}
+  </div>
+  <div class="section-h">Warning signs: reassess the plan</div>
+  <div class="card">
+    ${rule('0.25 stops feeling sufficient, or you want more.', 1)}
+    ${rule('High days rising over three 28-day blocks.', 1)}
+    ${rule('3 or more high days within 7 days that are not one run.', 1)}
+    ${rule('More than one very high day (0.5 or more).', 1)}
+    ${rule('Tremor, tingling or twitching keeps returning on off days (2 or more in 30 days).', 1)}
+  </div>
+  <p class="entry" style="text-align:center;margin:18px 8px 6px">These chains are produced by the same rules the app uses, so they always match what Today tells you.</p>`;
+}
+
 function renderToday() {
   const today = logicalToday();
   const p = planFor(today);
@@ -670,6 +869,8 @@ function renderToday() {
   const gaps = gapDays(today);
   const sym = symOf(today);
   const feel = S.checkins[today];
+  const cycle = currentCycle(today);
+  const showDetails = !!(feel || sym.tags.length || sym.note);
   const logged = info.entries.length > 0;
   const choice = p.head.includes(' or ');
   const heroCls = logged ? 'done' : p.kind === 'due' ? 'dose' : 'off';
@@ -695,28 +896,22 @@ function renderToday() {
     ${gaps.length ? '<div class="chip warn">Earlier days are not logged, so this plan may change. Catch up above.</div>' : ''}
     ${logged ? `<div class="done-badge ${pop ? 'pop' : ''}">${ICON.check} Saved for ${fmt(today)}</div>` : ''}
     ${quick}
-    ${timelineHtml(today)}
+    ${cycle ? chainHtml(cycle) + '<div class="hero-legend">Dashed = planned · tap a day to edit</div>' : ''}
     ${rollingLine(today)}
   </section>
   <div class="card">
     <div class="card-title">How do you feel today?</div>
-    <div class="entry">Helps you judge whether off days feel fine before widening.</div>
     <div class="seg">${Object.entries(FEELINGS).map(([k, v]) => `<button class="feel ${k} ${feel === k ? 'sel' : ''}" data-feel="${k}">${FACE[k]}${v}</button>`).join('')}</div>
-    <div class="label section-label" style="margin-top:16px">Anything going on?</div>
+    ${showDetails ? `<div class="label section-label" style="margin-top:16px">Anything going on?</div>
     ${tagButtons(today, 'data-tag')}
-    <input id="sym-note" placeholder="Optional: describe how today is going" value="${esc(sym.note)}" style="margin-top:10px">
-  </div>
-  <div class="card">
-    <div class="card-title">${logged ? 'Add another entry' : 'Log something different'}</div>
-    <div class="entry">Off-plan doses and other medication</div>
-    <div class="chips">
-      ${['sos', 'late', 'tremor'].map(k => `<button class="chip-btn" data-preset="${k}"><b>${PRESETS[k].label}</b><span>${PRESETS[k].sub}</span></button>`).join('')}
-      <button class="chip-btn more" data-preset=""><b>More</b><span>Sleep, other med, amount</span></button>
-    </div>
+    <input id="sym-note" placeholder="Optional: describe how today is going" value="${esc(sym.note)}" style="margin-top:10px">` : ''}
   </div>
   ${logged ? `<div class="card tappable" data-day="${today}"><div class="label">Today's entries · tap to edit</div>${info.entries.map(entryHtml).join('')}</div>` : ''}
-  ${backupLine}`;
+  ${backupLine}
+  <div style="height:64px"></div>
+  <button class="fab" id="fab" aria-label="Log a dose">${ICON.plus}Log</button>`;
 
+  $('#fab').onclick = () => openLog();
   document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => {
     const k = b.dataset.feel;
     if (S.checkins[today] === k) delete S.checkins[today]; else S.checkins[today] = k;
@@ -725,7 +920,6 @@ function renderToday() {
   document.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => { toggleTag(today, b.dataset.tag); buzz(8); renderToday(); });
   if ($('#sym-note')) debouncedNote($('#sym-note'), today);
   document.querySelectorAll('[data-gap]').forEach(b => b.onclick = () => catchUpAction(b.dataset.gap, b.dataset.d, gaps));
-  document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => openLog({ preset: b.dataset.preset }));
   if ($('#q-take')) $('#q-take').onclick = () => takeBridge(today, p.late ? 'late' : 'scheduled');
   if ($('#q-off')) $('#q-off').onclick = () => saveOff(today);
   if ($('#bk-now')) $('#bk-now').onclick = e => { e.preventDefault(); backup(); };
@@ -844,15 +1038,24 @@ function showToast(text, undo) {
 }
 
 // ---------- saving ----------
+const autoRemoved = {};
 function addEntry(e) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  if (e.dose > EPS) {
+    const offs = S.entries.filter(x => x.date === e.date && x.reason === 'off');
+    if (offs.length) { autoRemoved[id] = offs; S.entries = S.entries.filter(x => !offs.includes(x)); }
+  }
   S.entries.push({ id, at: new Date().toISOString(), ...e });
   sortEntries();
   justSaved = true;
   save(); render();
   return id;
 }
-function removeEntry(id) { S.entries = S.entries.filter(e => e.id !== id); save(); render(); }
+function removeEntry(id) {
+  S.entries = S.entries.filter(e => e.id !== id);
+  if (autoRemoved[id]) { S.entries.push(...autoRemoved[id]); delete autoRemoved[id]; sortEntries(); }
+  save(); render();
+}
 async function takeBridge(date, reason, { forceConfirm = false, sub = '' } = {}) {
   const w = checks(date, 0.125, reason);
   if (w.length || forceConfirm) {
@@ -1246,6 +1449,65 @@ function monthlyData(today) {
   });
 }
 
+function taperCurve(today) {
+  const f = firstLogged(); if (!f) return [];
+  const end = dayInfo(today).entries.length ? today : addDays(today, -1);
+  const tot = new Map(); S.entries.forEach(e => tot.set(e.date, (tot.get(e.date) || 0) + e.dose));
+  const pts = [];
+  for (let d = addDays(f, 27); d <= end; d = addDays(d, 1)) {
+    let sum = 0; for (let i = 0; i < 28; i++) sum += tot.get(addDays(d, -i)) || 0;
+    pts.push({ date: d, v: sum / 4 });
+  }
+  return pts;
+}
+const CURVE = { W: 340, H: 170, L: 30, Rt: 40, T: 16, B: 22 };
+function curveHtml(pts) {
+  if (pts.length < 2) return '<p class="entry">Shows once you have 4 weeks of log.</p>';
+  const { W, H, L, Rt, T, B } = CURVE, pw = W - L - Rt, ph = H - T - B;
+  const max = Math.max(...pts.map(p => p.v), 0.5), step = max <= 1 ? 0.25 : 0.5, top = Math.ceil(max / step) * step;
+  const x = i => L + (i / (pts.length - 1)) * pw, y = v => T + ph - (v / top) * ph;
+  let g = '';
+  for (let v = 0; v <= top + EPS; v += step) g += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${num(v)}</text>`;
+  pts.forEach((p, i) => { if (p.date.slice(8) === '01') g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${parse(p.date).toLocaleDateString(undefined, { month: 'short' })}</text>`; });
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+  g += `<path d="${line}L${x(pts.length - 1).toFixed(1)},${y(0)}L${x(0)},${y(0)}Z" fill="var(--accent)" fill-opacity=".1"/>`;
+  g += `<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const li = pts.length - 1, lv = pts[li].v;
+  g += `<circle cx="${x(li)}" cy="${y(lv)}" r="4" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/><text class="val" x="${x(li) + 7}" y="${y(lv) + 4}">${num(+lv.toFixed(2))}</text>`;
+  g += `<text class="val" x="${x(0)}" y="${y(pts[0].v) - 8}" text-anchor="start">${num(+pts[0].v.toFixed(2))}</text>`;
+  g += `<g id="cx" style="display:none"><line id="cxl" y1="${T}" y2="${T + ph}" stroke="var(--muted)" stroke-width="1"/><circle id="cxc" r="5" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/></g>`;
+  g += `<rect id="cx-hit" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/>`;
+  return `<div class="chart"><svg id="curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Taper curve: average mg per 7 days over the 28 days up to each day">${g}</svg></div>`;
+}
+function bindCurve(pts) {
+  const svg = $('#curve'); if (!svg || pts.length < 2) return;
+  const { W, H, L, Rt, T, B } = CURVE, pw = W - L - Rt, ph = H - T - B;
+  const max = Math.max(...pts.map(p => p.v), 0.5), step = max <= 1 ? 0.25 : 0.5, top = Math.ceil(max / step) * step;
+  const show = i => {
+    const p = pts[i], cx = L + (i / (pts.length - 1)) * pw, cy = T + ph - (p.v / top) * ph;
+    $('#cx').style.display = ''; $('#cxl').setAttribute('x1', cx); $('#cxl').setAttribute('x2', cx); $('#cxc').setAttribute('cx', cx); $('#cxc').setAttribute('cy', cy);
+    $('#curve-readout').innerHTML = `<b>${fmt(p.date)}:</b> ${num(+p.v.toFixed(3))} mg per 7 days (average of the 28 days up to then)`;
+  };
+  const at = ev => { const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) / r.width * W; show(Math.max(0, Math.min(pts.length - 1, Math.round((sx - L) / pw * (pts.length - 1))))); };
+  const hit = $('#cx-hit');
+  hit.addEventListener('pointerdown', at); hit.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'mouse') at(e); });
+}
+function dayGridHtml(today, weeks = 12) {
+  const f = firstLogged(), start = addDays(mondayOf(today), -7 * (weeks - 1));
+  let h = '<div class="dgrid"><span></span>' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span class="h">${x}</span>`).join('');
+  for (let w = 0; w < weeks; w++) {
+    const wk = addDays(start, 7 * w);
+    h += `<span class="wl">${w % 2 === 0 || w === weeks - 1 ? short(wk) : ''}</span>`;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(wk, i);
+      if (d > today) { h += '<span></span>'; continue; }
+      const info = dayInfo(d);
+      const cls = info.entries.length ? info.type : f && d >= f && d < today && !S.skipped[d] ? 'gap' : 'none';
+      h += `<button class="dc ${cls}${d === today ? ' today' : ''}" data-day="${d}" aria-label="${fmt(d)}">${S.checkins[d] === 'rough' ? '<i></i>' : ''}</button>`;
+    }
+  }
+  return h + '</div>';
+}
 function renderTrends() {
   const today = logicalToday();
   const st = S.settings;
@@ -1266,39 +1528,58 @@ function renderTrends() {
   if (held < 14) widenWarn.push(`Only ${held} days at the current step (needs 14).`);
   if (tremor14 > 0) widenWarn.push(`${tremor14} tremor dose${tremor14 > 1 ? 's' : ''} in the last 14 days.`);
   const stat = (k, v, flag) => `<div class="stat"><span>${k}</span><b class="${flag ? 'flag' : ''}">${v}</b></div>`;
-
+  const sign = (title, sub, v, flag) => `<div class="sign"><div class="ic ${flag ? 'flagc' : 'okc'}">${flag ? '!' : ICON.check}</div><div class="t">${title}<small>${sub}</small></div><div class="v ${flag ? 'flag' : ''}">${v}</div></div>`;
   const roll = rollingWindows(today);
   const allWeeks = weeklyData(today, 520).length;
   const weeks = weeklyData(today, chartWeeks || 520);
-  const thisW = weeks.length ? weeks[weeks.length - 1] : null, lastW = weeks.length > 1 ? weeks[weeks.length - 2] : null;
-  const sign = (title, sub, v, flag) => `<div class="sign"><div class="ic ${flag ? 'flagc' : 'okc'}">${flag ? '!' : ICON.check}</div><div class="t">${title}<small>${sub}</small></div><div class="v ${flag ? 'flag' : ''}">${v}</div></div>`;
   const stepIdx = INTERVAL_STEPS.indexOf(every);
-  const insight = trendInsight(today);
   const vhDays = days.filter(d => inPlan(d) && dayInfo(d).type === 'vhigh'), lastVh = vhDays[vhDays.length - 1];
   const days14 = [...Array(14)].map((_, i) => addDays(today, -i));
-  const checked14 = days14.filter(d => S.checkins[d] || symOf(d).tags.length || symOf(d).note).length;
+  const high28 = [...Array(28)].map((_, i) => addDays(today, -i)).filter(d => inPlan(d) && isHigh(dayInfo(d).type)).length;
+  const reds = [];
+  if (ws.tremor30 >= 2) reds.push('tremor doses');
+  if (ws.vhigh > 1) reds.push('very high days');
+  if (ws.cluster) reds.push(`high-day cluster (latest ${short(ws.cluster)})`);
+  if (ws.rising) reds.push('high days rising');
+  if (sleep30 > 2) reds.push('sleep exceptions');
+  const full = roll && roll.cur.days === 7 && roll.prev.days === 7;
+  const d7 = full ? roll.cur.total - roll.prev.total : 0;
+  const pts = taperCurve(today);
+  const tagCounts = SYMPTOM_TAGS.map(t => [t, days14.filter(d => symOf(d).tags.includes(t)).length]).filter(([, n]) => n);
   $('#app').innerHTML = `
-  <div class="kpis">
-    <div class="kpi"><b>${roll ? num(roll.cur.total) : '0'}<small> mg</small></b><span>Last 7 days</span></div>
-    <div class="kpi"><b>${roll && roll.prev.days === 7 ? num(roll.prev.total) : '–'}<small>${roll && roll.prev.days === 7 ? ' mg' : ''}</small></b><span>The 7 before</span></div>
-    <div class="kpi"><b>${lastHigh ? diffDays(lastHigh, today) : '–'}<small>${lastHigh ? ' d' : ''}</small></b><span>Since last 0.25</span></div>
+  <div class="status ${reds.length ? 'bad' : 'ok'}">
+    <b>${reds.length ? 'Reassess: ' + capFirst(reds.join(', ')) : 'No warning signs'}</b>
+    <span>${roll ? `Last 7 days ${num(roll.cur.total)} mg${full ? `, ${deltaText(d7)} from the 7 before` : ''}.` : 'Start logging to see trends.'}</span>
   </div>
-  ${insight.length ? `<div class="card insight"><div class="card-title">Recent trend</div>${insight.map(t => `<p>${t}</p>`).join('')}</div>` : ''}
+  <div class="tiles4">
+    <div class="kpi"><b>${roll ? num(roll.cur.total) : '0'}<small> mg</small></b><span>Last 7 days</span>${full ? `<small class="delta">${Math.abs(d7) < EPS ? 'same as' : (d7 < 0 ? '▼ ' : '▲ ') + num(Math.abs(d7))} vs 7 before</small>` : ''}</div>
+    <div class="kpi"><b>${high28}</b><span>High days, last 28</span><small class="delta">0.25 or more</small></div>
+    <div class="kpi"><b>${lastHigh ? diffDays(lastHigh, today) : '–'}<small>${lastHigh ? ' days' : ''}</small></b><span>Since last 0.25</span></div>
+    <div class="kpi"><b style="font-size:17px">${capFirst(intervalName(every))}</b><span>Current step</span><small class="delta">${held >= 14 ? `${held} days, 14 needed` : `${held} of 14 days held`}</small></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Taper curve</div>
+    <div class="entry">Average mg per 7 days, over the 28 days up to each day. Going down means you are tapering.</div>
+    ${curveHtml(pts)}
+    <div class="readout" id="curve-readout">${pts.length > 1 ? `<b>Now:</b> ${num(+pts[pts.length - 1].v.toFixed(3))} mg per 7 days. Tap the chart to see any day.` : ''}</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Last 12 weeks</div>
+    <div class="legend" style="margin-top:4px"><span><i style="background:var(--raised);border:1px solid var(--line)"></i>off</span><span><i style="background:var(--c-bridge)"></i>0.125</span><span><i style="background:var(--c-high)"></i>0.25 to 0.375</span><span><i style="background:var(--bad)"></i>0.5+</span><span><i style="border:1.5px dashed var(--warn)"></i>not logged</span><span><i style="background:var(--warn);border-radius:50%"></i>rough day</span></div>
+    ${dayGridHtml(today)}
+    <p class="entry" style="margin:10px 0 0">Check-ins, last 14 days: ${feel14.ok} OK, ${feel14.some} some symptoms, ${feel14.rough} rough${tagCounts.length ? '. Tags: ' + tagCounts.map(([t, n]) => `${t} ${n}`).join(', ') : ''}. Tap a day to see or edit it.</p>
+  </div>
   <div class="card">
     <div class="card-title">Milligrams per week</div>
     ${allWeeks > 8 ? `<div class="rangebar">${[[8, '8 weeks'], [16, '16 weeks'], [0, 'All']].map(([n, l]) => `<button class="rng ${chartWeeks === n ? 'sel' : ''}" data-rng="${n}">${l}</button>`).join('')}</div>` : ''}
     <div class="legend" style="margin-top:4px"><span><i style="background:var(--c-bridge)"></i>Bridge days (0.125)</span><span><i style="background:var(--c-high)"></i>High days (0.25+)</span><span><i style="background:var(--muted);opacity:.5"></i>Lighter bar = partial week</span></div>
     ${weeklyChartHtml(weeks)}
     <div class="readout" id="wk-readout">${weeks.length ? weekReadout(weeks[weeks.length - 1]) : ''}</div>
-    <p class="entry" style="margin:8px 0 0">Weeks run Monday to Sunday. Tap a bar for details. Other-medication notes are not counted.</p>
     ${weeks.length ? `<details style="margin-top:10px"><summary class="entry" style="font-weight:700">Show table</summary><table class="wk">
       <tr><th>Week of</th><th>Total</th><th>Bridge</th><th>High</th><th>Dosed</th><th>Not logged</th></tr>
       ${weeks.slice().reverse().map(w => `<tr><td>${short(w.start)}${w.partial ? '*' : ''}</td><td>${num(w.total)}</td><td>${num(w.bridge)}</td><td>${num(w.high)}</td><td>${w.dosed}/${w.logged}</td><td>${w.unlogged}</td></tr>`).join('')}
     </table><p class="entry">* partial week</p></details>` : ''}
   </div>
-  ${weeks.length ? `<div class="card"><div class="card-title">Days dosed per week</div>
-    <div class="entry">Out of 7. Lighter bar = partial week.</div>
-    ${daysChartHtml(weeks)}</div>` : ''}
   ${(() => { const ms = monthlyData(today); return ms.length > 1 ? `<div class="card"><div class="card-title">Month by month</div>
     <div class="entry">"Per 7 d" is the average over days you logged, so unfinished months and unlogged days do not drag it down.</div>
     <table class="wk"><tr><th>Month</th><th>mg</th><th>Per 7 d</th><th>Dosed</th><th>High</th></tr>
@@ -1315,14 +1596,6 @@ function renderTrends() {
     <div class="note info">Also reassess if 0.25 stops feeling sufficient or you want more.</div>
   </div>
   <div class="card">
-    <div class="card-title">Check-ins, last 14 days</div>
-    <div class="entry">${checked14} of 14 days checked in</div>
-    ${stat('Felt OK', feel14.ok + (feel14.ok === 1 ? ' day' : ' days'))}
-    ${stat('Some symptoms', feel14.some + (feel14.some === 1 ? ' day' : ' days'))}
-    ${stat('Rough', feel14.rough + (feel14.rough === 1 ? ' day' : ' days'))}
-    ${SYMPTOM_TAGS.map(t => stat(t, `${days14.filter(d => symOf(d).tags.includes(t)).length} of 14 days`)).join('')}
-  </div>
-  <div class="card">
     <div class="card-title">Widening</div>
     <div class="steps">${INTERVAL_STEPS.map((n, i) => `<div class="${i < stepIdx ? 'done' : i === stepIdx ? 'cur' : ''}">${n === 0 ? 'none' : n === 7 ? 'weekly' : 'every ' + n}</div>`).join('')}</div>
     <div class="stat"><span>Days at this step</span><b>${held} of 14</b></div>
@@ -1335,6 +1608,7 @@ function renderTrends() {
       <button class="${widenWarn.length ? 'secondary' : 'primary'}" id="widen" style="width:100%;margin-top:12px">Move to ${intervalName(next)}</button>`}
     ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="width:100%;margin-top:10px">Undo last interval change</button>` : ''}
   </div>`;
+  bindCurve(pts);
   document.querySelectorAll('[data-rng]').forEach(b => b.onclick = () => { chartWeeks = +b.dataset.rng; renderTrends(); });
   document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
     document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));

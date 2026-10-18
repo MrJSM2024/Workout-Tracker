@@ -51,11 +51,17 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   take and off always ask for confirmation.
 - Visual system: tokens on :root (light) and prefers-color-scheme dark; cards with soft shadow, 20px radius;
   icon bottom nav; per-tab large title. `APP_VERSION` is shown in Settings, bump it on each release.
-- Today hero card changes by state (green = dose due, neutral = off/logged) and has a 7-day timeline:
-  3 past days (actual), today, 3 future days projected by `projection()` (simulated, never saved).
+- Today hero card changes by state (green = dose due, neutral = off/logged) and shows the current cycle as a
+  pattern chain (`currentCycle()` + `chainHtml()`): from the last dose (whole high run) to the next 0.125, with
+  today ringed and planned days dashed (from `projection()`, simulated, never saved). Off runs of 4+ collapse to "off ×N".
 - Today: one-tap "I took 0.125" / "Confirm off day" from the plan card, undo toast after every save,
-  daily "How do you feel" check-in (stored in `S.checkins[date]`: ok / some / rough), and a collapsed
-  "Log something different" form for SOS, late, tremor and other-medication entries.
+  daily check-in (faces first; tags and note appear once a face is picked), and a floating "+ Log" button
+  that opens `openLog()` (PRESETS order: SOS first, tremor last).
+- Logging a dose above 0 removes that day's "off" entry (`autoRemoved`); Undo puts it back. Existing data is never auto-cleaned.
+- Plan tab (`renderPlan()`): every scenario drawn as a chain by `simulatePattern()`, which runs the real engine on a
+  blank simulated state (swaps `S`, restores it in `finally`). Plus widening ladder, hard limits, warning signs.
+- Trends is a dashboard: status line (warning signs), 4 tiles, taper curve (`taperCurve()`: 28-day rolling mg per 7 days,
+  tap readout), 12-week day grid (`dayGridHtml()`, rough-day dots), weekly mg chart, month table, warning signs, widening.
 - Check-ins appear in History, the copied log, and the Widening card (last 14 days).
 
 ## Rules logic (spec v2, from the owner's plan thread; in `planFor()`, `checks()`, `warningSigns()`)
