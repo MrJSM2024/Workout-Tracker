@@ -298,6 +298,10 @@
   .backup-line button { border: 0; background: none; color: var(--accent); font-weight: 800; padding: 10px 8px; }
   .insight p { margin: 6px 0 0; font-size: 15px; }
   .insight p:first-of-type { margin-top: 10px; }
+  .roll { margin-top: 12px; font-size: 13px; text-align: center; opacity: .85; }
+  .rangebar { display: flex; gap: 6px; margin-top: 10px; }
+  .rng { flex: 1; padding: 8px 4px; border: 0; border-radius: 10px; background: var(--raised); color: var(--muted); font-weight: 700; font-size: 13px; }
+  .rng.sel { background: var(--accent-soft); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -330,7 +334,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-13b';
+const APP_VERSION = '2026-10-18';
 const PRESETS = {
   bridge:   { label: '0.125', sub: 'Bridge dose', dose: 0.125, reason: 'scheduled' },
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
@@ -575,6 +579,7 @@ const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let tab = 'today';
 let lastTab = null;
+let chartWeeks = 16, histAll = false;
 let justSaved = false;
 
 function render() {
@@ -681,6 +686,7 @@ function renderToday() {
     ${logged ? `<div class="done-badge ${pop ? 'pop' : ''}">${ICON.check} Saved for ${fmt(today)}</div>` : ''}
     ${quick}
     ${timelineHtml(today)}
+    ${rollingLine(today)}
   </section>
   <div class="card">
     <div class="card-title">How do you feel today?</div>
@@ -719,7 +725,7 @@ function renderToday() {
 // ---------- catch-up for days with no entry ----------
 function gapDays(today) {
   const f = firstLogged(); if (!f) return [];
-  const back = addDays(today, -7);
+  const back = addDays(today, -14);
   const out = [];
   for (let d = back > f ? back : f; d < today; d = addDays(d, 1))
     if (!dayInfo(d).entries.length && !S.skipped[d]) out.push(d);
@@ -1063,7 +1069,7 @@ function renderHistory() {
   }
   cal += '</div>';
   // list grouped by week, newest first
-  let list = '';
+  let list = '', wkShown = 0, wkHidden = 0;
   for (let w = mondayOf(today); w >= mondayOf(start); w = addDays(w, -7)) {
     let rows = '', total = 0;
     for (let i = 6; i >= 0; i--) {
@@ -1077,8 +1083,10 @@ function renderHistory() {
         <div class="day-body">${tagBits ? `<div class="tags-inline">${tagBits}</div>` : ''}${info.entries.map(entryHtml).join('') || `<span class="entry">${gapText}</span>`}${sy && sy.note ? `<div class="entry">“${esc(sy.note)}”</div>` : ''}</div>
         ${pillHtml(info.total, info.entries.length > 0, d)}</div>`;
     }
-    if (rows) list += `<div class="wk-head"><b>Week of ${short(w)}</b><span>${num(total)} mg</span></div><div class="card" style="margin-top:0;padding:4px 16px">${rows}</div>`;
+    if (rows && !histAll && wkShown >= 8) wkHidden++;
+    else if (rows) { wkShown++; list += `<div class="wk-head"><b>Week of ${short(w)}</b><span>${num(total)} mg</span></div><div class="card" style="margin-top:0;padding:4px 16px">${rows}</div>`; }
   }
+  if (wkHidden) list += `<button class="secondary wide" id="hist-more" style="margin-top:14px">Show ${wkHidden} older week${wkHidden > 1 ? 's' : ''}</button>`;
   $('#app').innerHTML = `
     <div class="card">
       <div class="card-title">Last 5 weeks</div>
@@ -1088,6 +1096,7 @@ function renderHistory() {
     <button class="primary" id="copy-hist" style="margin-top:0">Copy log</button>
     ${list || '<p class="plan-text">Nothing logged yet.</p>'}`;
   $('#copy-hist').onclick = openCopy;
+  if ($('#hist-more')) $('#hist-more').onclick = () => { histAll = true; renderHistory(); };
 }
 
 // ---------- weekly chart ----------
@@ -1166,23 +1175,65 @@ function daysChartHtml(weeks) {
   });
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Days dosed per week, last ${weeks.length} weeks">${g}</svg></div>`;
 }
+function rollingWindows(today) {
+  const f = firstLogged(); if (!f) return null;
+  const end = dayInfo(today).entries.length ? today : addDays(today, -1); // today counts once it has an entry
+  const win = (e, n) => {
+    let total = 0, high = 0, dosed = 0, unlogged = 0, days = 0;
+    for (let i = 0; i < n; i++) {
+      const d = addDays(e, -i); if (d < f) continue;
+      days++;
+      const info = dayInfo(d); total += info.total;
+      if (isHigh(info.type)) high++;
+      if (info.total > EPS) dosed++;
+      if (!info.entries.length && d < today && !S.skipped[d]) unlogged++;
+    }
+    return { total, high, dosed, unlogged, days, from: addDays(e, -(n - 1)), to: e };
+  };
+  return { cur: win(end, 7), prev: win(addDays(end, -7), 7), cur28: win(end, 28), prev28: win(addDays(end, -28), 28) };
+}
+const deltaText = d => Math.abs(d) < EPS ? 'no change' : d < 0 ? `down ${num(-d)} mg` : `up ${num(d)} mg`;
 function trendInsight(today) {
-  const weeks = weeklyData(today, 520);
-  const cur = weeks[weeks.length - 1];
-  if (!cur) return [];
-  const prev = weeks.length > 1 ? weeks[weeks.length - 2] : null;
-  const n = diffDays(cur.start, today) + 1, plural = n > 1 ? 's' : '';
-  const out = [];
-  if (prev && !prev.partial) {
-    let same = 0;
-    for (let i = 0; i < n; i++) same += dayInfo(addDays(prev.start, i)).total;
-    const delta = cur.total - same;
-    const rel = Math.abs(delta) < EPS ? 'no change' : delta < 0 ? `down ${num(-delta)} mg` : `up ${num(delta)} mg`;
-    out.push(`<b>This week so far:</b> ${num(cur.total)} mg over ${n} day${plural}. Same ${n === 1 ? 'day' : n + ' days'} last week: ${num(same)} mg (${rel}).`);
-    out.push(`High days: ${cur.highDays} this week so far, ${prev.highDays} last week.`);
-  } else out.push(`<b>This week so far:</b> ${num(cur.total)} mg over ${n} day${plural}. Not enough earlier history to compare yet.`);
-  if (cur.unlogged) out.push(`${cur.unlogged} day${cur.unlogged > 1 ? 's' : ''} this week not logged, so totals may be low.`);
+  const w = rollingWindows(today); if (!w) return [];
+  const { cur, prev, cur28, prev28 } = w, out = [];
+  const range = `${short(cur.from)} to ${short(cur.to)}`;
+  if (cur.days === 7 && prev.days === 7) {
+    out.push(`<b>Last 7 days</b> (${range}): ${num(cur.total)} mg, ${deltaText(cur.total - prev.total)} from the 7 days before (${num(prev.total)} mg).`);
+    out.push(`High days: ${cur.high} (before: ${prev.high}). Days dosed: ${cur.dosed} of 7 (before: ${prev.dosed} of 7).`);
+  } else out.push(`<b>Last ${cur.days} day${cur.days === 1 ? '' : 's'}</b> (${range}): ${num(cur.total)} mg. Not enough earlier history to compare yet.`);
+  if (cur28.days === 28 && prev28.days === 28 && cur28.unlogged + prev28.unlogged > 3)
+    out.push(`28-day comparison hidden: ${cur28.unlogged + prev28.unlogged} days in those windows are not logged.`);
+  else if (cur28.days === 28 && prev28.days === 28) {
+    const a = cur28.total / 4, b = prev28.total / 4;
+    const chg = b > EPS ? (Math.abs(a - b) < EPS ? ' (no change)' : ` (${a < b ? 'down' : 'up'} ${Math.round(Math.abs(a - b) / b * 100)}%)`) : '';
+    out.push(`Last 28 days: ${num(a)} mg per 7 days on average. The 28 days before: ${num(b)}${chg}.`);
+  }
+  if (cur.unlogged) out.push(`${cur.unlogged} day${cur.unlogged > 1 ? 's' : ''} in the last 7 not logged, so these totals may be low.`);
   return out;
+}
+function rollingLine(today) {
+  const w = rollingWindows(today); if (!w || !w.cur.days) return '';
+  const { cur, prev } = w;
+  return `<div class="roll">Last 7 days: <b>${num(cur.total)} mg</b>${cur.days === 7 && prev.days === 7 ? ` · the 7 before: ${num(prev.total)} mg` : ''}</div>`;
+}
+function monthlyData(today) {
+  const f = firstLogged(); if (!f) return [];
+  const map = new Map();
+  for (let d = f; d <= today; d = addDays(d, 1)) {
+    const k = d.slice(0, 7), info = dayInfo(d);
+    const m = map.get(k) || { key: k, days: 0, counted: 0, total: 0, dosed: 0, high: 0, vhigh: 0, unlogged: 0, partial: false };
+    m.days++; m.total += info.total;
+    if (info.entries.length) m.counted++;
+    if (info.total > EPS) m.dosed++;
+    if (isHigh(info.type)) m.high++;
+    if (info.type === 'vhigh') m.vhigh++;
+    if (!info.entries.length && d < today && !S.skipped[d]) m.unlogged++;
+    map.set(k, m);
+  }
+  return [...map.values()].map(m => {
+    const [y, mo] = m.key.split('-').map(Number), dim = new Date(y, mo, 0).getDate();
+    return { ...m, per7: m.counted ? m.total / m.counted * 7 : 0, partial: m.days < dim, label: new Date(y, mo - 1, 1).toLocaleDateString(undefined, { month: 'short' }) };
+  });
 }
 
 function renderTrends() {
@@ -1206,22 +1257,26 @@ function renderTrends() {
   if (tremor14 > 0) widenWarn.push(`${tremor14} tremor dose${tremor14 > 1 ? 's' : ''} in the last 14 days.`);
   const stat = (k, v, flag) => `<div class="stat"><span>${k}</span><b class="${flag ? 'flag' : ''}">${v}</b></div>`;
 
-  const weeks = weeklyData(today);
+  const roll = rollingWindows(today);
+  const allWeeks = weeklyData(today, 520).length;
+  const weeks = weeklyData(today, chartWeeks || 520);
   const thisW = weeks.length ? weeks[weeks.length - 1] : null, lastW = weeks.length > 1 ? weeks[weeks.length - 2] : null;
   const sign = (title, sub, v, flag) => `<div class="sign"><div class="ic ${flag ? 'flagc' : 'okc'}">${flag ? '!' : ICON.check}</div><div class="t">${title}<small>${sub}</small></div><div class="v ${flag ? 'flag' : ''}">${v}</div></div>`;
   const stepIdx = INTERVAL_STEPS.indexOf(every);
   const insight = trendInsight(today);
+  const vhDays = days.filter(d => dayInfo(d).type === 'vhigh'), lastVh = vhDays[vhDays.length - 1];
   const days14 = [...Array(14)].map((_, i) => addDays(today, -i));
   const checked14 = days14.filter(d => S.checkins[d] || symOf(d).tags.length || symOf(d).note).length;
   $('#app').innerHTML = `
   <div class="kpis">
-    <div class="kpi"><b>${thisW ? num(thisW.total) : '0'}<small> mg</small></b><span>This week${thisW && thisW.partial ? ' so far' : ''}</span></div>
-    <div class="kpi"><b>${lastW ? num(lastW.total) : '–'}<small>${lastW ? ' mg' : ''}</small></b><span>Last week</span></div>
+    <div class="kpi"><b>${roll ? num(roll.cur.total) : '0'}<small> mg</small></b><span>Last 7 days</span></div>
+    <div class="kpi"><b>${roll && roll.prev.days === 7 ? num(roll.prev.total) : '–'}<small>${roll && roll.prev.days === 7 ? ' mg' : ''}</small></b><span>The 7 before</span></div>
     <div class="kpi"><b>${lastHigh ? diffDays(lastHigh, today) : '–'}<small>${lastHigh ? ' d' : ''}</small></b><span>Since last 0.25</span></div>
   </div>
-  ${insight.length ? `<div class="card insight"><div class="card-title">This week</div>${insight.map(t => `<p>${t}</p>`).join('')}</div>` : ''}
+  ${insight.length ? `<div class="card insight"><div class="card-title">Recent trend</div>${insight.map(t => `<p>${t}</p>`).join('')}</div>` : ''}
   <div class="card">
     <div class="card-title">Milligrams per week</div>
+    ${allWeeks > 8 ? `<div class="rangebar">${[[8, '8 weeks'], [16, '16 weeks'], [0, 'All']].map(([n, l]) => `<button class="rng ${chartWeeks === n ? 'sel' : ''}" data-rng="${n}">${l}</button>`).join('')}</div>` : ''}
     <div class="legend" style="margin-top:4px"><span><i style="background:var(--c-bridge)"></i>Bridge days (0.125)</span><span><i style="background:var(--c-high)"></i>High days (0.25+)</span><span><i style="background:var(--muted);opacity:.5"></i>Lighter bar = partial week</span></div>
     ${weeklyChartHtml(weeks)}
     <div class="readout" id="wk-readout">${weeks.length ? weekReadout(weeks[weeks.length - 1]) : ''}</div>
@@ -1234,11 +1289,16 @@ function renderTrends() {
   ${weeks.length ? `<div class="card"><div class="card-title">Days dosed per week</div>
     <div class="entry">Out of 7. Lighter bar = partial week.</div>
     ${daysChartHtml(weeks)}</div>` : ''}
+  ${(() => { const ms = monthlyData(today); return ms.length > 1 ? `<div class="card"><div class="card-title">Month by month</div>
+    <div class="entry">"Per 7 d" is the average over days you logged, so unfinished months and unlogged days do not drag it down.</div>
+    <table class="wk"><tr><th>Month</th><th>mg</th><th>Per 7 d</th><th>Dosed</th><th>High</th></tr>
+    ${ms.slice().reverse().map(m => `<tr><td>${m.label}${m.partial ? '*' : ''}${m.unlogged ? `<br><small class="entry">${m.unlogged} not logged</small>` : ''}</td><td>${num(m.total)}</td><td>${m.counted ? num(m.per7) : '–'}</td><td>${m.dosed}/${m.counted}</td><td>${m.high}</td></tr>`).join('')}
+    </table><p class="entry">* month not finished or started mid-month</p></div>` : ''; })()}
   <div class="card">
     <div class="card-title">Warning signs</div>
     <div class="entry">From your plan. Red means reassess.</div>
     ${sign('Tremor doses', 'last 30 days · flag at 2', ws.tremor30, ws.tremor30 >= 2)}
-    ${sign('Very high days', 'all time · flag above 1', ws.vhigh, ws.vhigh > 1)}
+    ${sign('Very high days', `all time · flag above 1${lastVh ? ' · latest ' + short(lastVh) : ''}`, ws.vhigh, ws.vhigh > 1)}
     ${sign('High-day clusters', '3+ in 7 days, not one run', ws.cluster ? short(ws.cluster) : 'none', !!ws.cluster)}
     ${sign('High days per 28 days', 'oldest → now · flag if rising twice', ws.blocks.join(' → '), ws.rising)}
     ${sign('Sleep exceptions', 'last 30 days · max 2', sleep30, sleep30 > 2)}
@@ -1265,6 +1325,7 @@ function renderTrends() {
       <button class="${widenWarn.length ? 'secondary' : 'primary'}" id="widen" style="width:100%;margin-top:12px">Move to ${intervalName(next)}</button>`}
     ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="width:100%;margin-top:10px">Undo last interval change</button>` : ''}
   </div>`;
+  document.querySelectorAll('[data-rng]').forEach(b => b.onclick = () => { chartWeeks = +b.dataset.rng; renderTrends(); });
   document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
     document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));
     $('#wk-readout').innerHTML = weekReadout(weeks[+h.dataset.wk]);
@@ -1435,6 +1496,13 @@ function logText(range = 'all') {
     `3+ high days in 7 days, not one run: ${ws.cluster ? 'yes, latest ' + ws.cluster : 'no'}`,
     `High days per 28-day block, oldest to now: ${ws.blocks.join(', ')}${ws.rising ? ' (rising, flagged)' : ''}`,
     `Sleep exceptions, last 30 days: ${sleepDaysIn(today, 30)} (max 2)`);
+  if (range === 'all') {
+    const ms = monthlyData(today);
+    if (ms.length > 1) {
+      lines.push('', 'BY MONTH (mg, mg per 7 days, days dosed, high days)');
+      ms.forEach(m => lines.push(`${m.key}${m.partial ? ' (partial)' : ''}: ${num(m.total)} mg, ${m.counted ? num(m.per7) : 'n/a'} per 7 days (logged days only), ${m.dosed}/${m.counted} logged days dosed, ${m.high} high days${m.vhigh ? ` (${m.vhigh} very high)` : ''}${m.unlogged ? `, ${m.unlogged} not logged` : ''}`));
+    }
+  }
   lines.push('', 'WEEKLY TOTALS (Mon to Sun, mg)');
   weeklyData(today, 520).filter(w => addDays(w.start, 6) >= from).forEach(w => lines.push(`Week of ${w.start}${w.partial ? ' (partial)' : ''}: ${num(w.total)} total (bridge ${num(w.bridge)}, high ${num(w.high)}), ${w.dosed}/${w.logged} days dosed${w.unlogged ? `, ${w.unlogged} not logged` : ''}`));
   return lines.join('\n');
@@ -1457,10 +1525,17 @@ async function copyLog(range = 'all') {
   catch (e) { shareOrDownload(`dose-log-${logicalToday()}.txt`, t, 'text/plain'); }
 }
 function exportCsv() {
-  const q = s => `"${String(s).replace(/"/g, '""')}"`;
-  const rows = [['date', 'logged_at', 'dose_mg', 'reason', 'note'].join(',')]
-    .concat(S.entries.map(e => [e.date, e.at, e.dose, q(REASONS[e.reason] || e.reason), q(e.note || '')].join(',')));
-  shareOrDownload(`dose-log-${logicalToday()}.csv`, rows.join('\n'), 'text/csv');
+  const q = v => `"${String(v).replace(/"/g, '""')}"`, today = logicalToday();
+  const first = S.entries.length ? S.entries[0].date : S.settings.startDate;
+  const rows = [['date', 'status', 'total_mg', 'doses_mg', 'reasons', 'entry_notes', 'felt', 'tags', 'day_note'].join(',')];
+  for (let d = first; d <= today; d = addDays(d, 1)) {
+    const i = dayInfo(d), sy = S.symptoms[d];
+    const doses = i.entries.filter(e => e.dose > 0);
+    const status = !i.entries.length ? (d === today ? 'not logged yet' : S.skipped[d] ? 'skipped' : 'not logged') : i.total > EPS ? 'dosed' : i.entries.some(e => e.reason === 'othermed') ? 'other medication only' : 'off';
+    rows.push([d, status, i.entries.length ? +i.total.toFixed(4) : '', doses.map(e => e.dose).join(' + '), q(i.entries.map(e => REASONS[e.reason] || e.reason).join('; ')),
+      q(i.entries.map(e => e.note).filter(Boolean).join(' | ')), S.checkins[d] ? FEELINGS[S.checkins[d]] : '', q(sy ? sy.tags.join('; ') : ''), q(sy ? sy.note : '')].join(','));
+  }
+  shareOrDownload(`dose-log-${today}.csv`, rows.join('\n'), 'text/csv');
 }
 function restore(ev) {
   const f = ev.target.files[0]; if (!f) return;
@@ -1480,24 +1555,46 @@ function restore(ev) {
 }
 
 // ---------- import link (#import=<base64url JSON [[date, dose, reason, note], ...]>) ----------
+// Accepts rows [[date, dose, reason, note], ...] or a compact run {s: startDate, d: [dose per day...], n: [extra rows]}.
+function expandImport(raw) {
+  const isDate = x => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) && !isNaN(parse(x));
+  let rows;
+  if (Array.isArray(raw)) rows = raw;
+  else if (raw && isDate(raw.s) && Array.isArray(raw.d) && raw.d.length <= 800)
+    rows = raw.d.map((v, i) => [addDays(raw.s, i), v, v > 0 ? 'backfill' : 'off', '']).concat(Array.isArray(raw.n) ? raw.n : []);
+  else throw new Error('bad data');
+  if (!rows.length || rows.length > 900 || !rows.every(r => Array.isArray(r) && isDate(r[0]) && typeof r[1] === 'number' && r[1] >= 0 && r[1] <= 2)) throw new Error('bad data');
+  return rows;
+}
 async function importFromHash() {
   const m = location.hash.match(/^#import=([A-Za-z0-9_-]+)$/);
   if (!m) return;
   history.replaceState(null, '', location.pathname + location.search);
   let rows;
-  try {
-    rows = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
-    if (!Array.isArray(rows) || !rows.every(r => /^\d{4}-\d{2}-\d{2}$/.test(r[0]) && r[1] >= 0)) throw new Error('bad data');
-  } catch (e) { showToast('That import link is not valid.'); return; }
-  const fresh = () => { S = load(); return rows.filter(r => !S.entries.some(e => e.date === r[0] && Math.abs(e.dose - r[1]) < EPS && (e.note || '') === (r[3] || ''))); };
-  const first = fresh();
-  if (!first.length) { showToast('Those entries are already in your log.'); return; }
-  const ok = await askConfirm({ title: `Add ${first.length} entr${first.length === 1 ? 'y' : 'ies'} to your log?`, items: first.map(r => `${fmt(r[0])}: ${r[1] > 0 ? r[1] + ' mg' : (r[3] || 'off')}`), ok: 'Add' });
+  try { rows = expandImport(JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))))); }
+  catch (e) { showToast('That import link is not valid.'); return; }
+  // Only days with no entry are filled in. Anything already logged is kept exactly as it is.
+  const plan = () => {
+    S = load();
+    const have = new Set(S.entries.map(e => e.date));
+    return {
+      add: rows.filter(r => !have.has(r[0])),
+      conflicts: rows.filter(r => have.has(r[0]) && r[2] !== 'othermed' && Math.abs(dayInfo(r[0]).total - r[1]) > EPS),
+    };
+  };
+  const p1 = plan();
+  if (!p1.add.length) { showToast(p1.conflicts.length ? `Nothing added. ${p1.conflicts.length} days differ from your log, so yours were kept.` : 'Those days are already in your log.'); return; }
+  const dates = p1.add.map(r => r[0]).sort();
+  const sum = p1.add.reduce((a, r) => a + (r[2] === 'othermed' ? 0 : r[1]), 0);
+  const items = p1.add.length <= 12 ? p1.add.map(r => `${fmt(r[0])}: ${r[1] > 0 ? r[1] + ' mg' : (r[3] || 'off')}`)
+    : [`${p1.add.length} entries, ${fmt(dates[0])} to ${fmt(dates[dates.length - 1])}`, `${p1.add.filter(r => r[1] > 0).length} dose days, ${p1.add.filter(r => r[1] === 0 && r[2] !== 'othermed').length} off days`, `${num(sum)} mg in total`];
+  const lines = p1.conflicts.length ? [`${p1.conflicts.length} day${p1.conflicts.length > 1 ? 's are' : ' is'} already logged differently and will be kept as you logged ${p1.conflicts.length > 1 ? 'them' : 'it'}: ${p1.conflicts.slice(0, 5).map(r => `${short(r[0])} (yours ${num(dayInfo(r[0]).total)}, link ${num(r[1])})`).join(', ')}${p1.conflicts.length > 5 ? '…' : ''}`] : [];
+  const ok = await askConfirm({ title: `Add ${p1.add.length} entr${p1.add.length === 1 ? 'y' : 'ies'} to your log?`, sub: 'Only days with no entry are filled in. Anything you already logged stays as it is.', lines, items, ok: 'Add' });
   if (!ok) return;
-  const list = fresh(); // latest saved data, in case anything changed while the sheet was open
+  const p2 = plan(); // latest saved data, in case anything changed while the sheet was open
   const now = new Date().toISOString();
-  list.forEach((r, i) => S.entries.push({ id: Date.now().toString(36) + i, at: now, date: r[0], dose: +r[1], reason: r[2] || 'other', note: r[3] || '' }));
-  sortEntries(); save(); render(); showToast(`Added ${list.length} entr${list.length === 1 ? 'y' : 'ies'}`);
+  p2.add.forEach((r, i) => S.entries.push({ id: Date.now().toString(36) + i, at: now, date: r[0], dose: +r[1], reason: r[2] || 'other', note: r[3] || '' }));
+  sortEntries(); save(); render(); showToast(`Added ${p2.add.length} entr${p2.add.length === 1 ? 'y' : 'ies'}`);
 }
 
 // ---------- launch shortcuts (long-press the app icon) ----------

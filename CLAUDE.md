@@ -25,6 +25,12 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   The display name is typed into the app and stored locally.
 
 ## UI notes
+- Import links: `#import=<base64url JSON>`, either rows `[[date, dose, reason, note], ...]` or a compact run
+  `{s: startDate, d: [dose per consecutive day], n: [extra rows]}` (`expandImport()`). Import only fills days that have
+  no entry and keeps anything already logged (conflicts are listed in the confirm sheet). Never overwrite or double-count.
+- Trends compares rolling 7-day and 28-day windows (`rollingWindows()`), not Monday weeks; the chart has an 8 / 16 / All
+  weeks toggle and there is a month-by-month table (per-7-day average uses logged days only). History folds weeks older than 8.
+- CSV export is one row per day (status, total, doses, reasons, notes, felt, tags, day note).
 - Data completeness: a day with no entry is "not logged", never "off" (History pill, calendar dashes, copied log).
   Today shows a one-at-a-time catch-up card for unlogged days in the last 7 (`gapDays()`); answers: took 0.125,
   off day, other, skip (`S.skipped[date]`), or mark all as off. The plan engine treats unlogged days as off, so
