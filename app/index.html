@@ -334,7 +334,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-18';
+const APP_VERSION = '2026-10-18b';
 const PRESETS = {
   bridge:   { label: '0.125', sub: 'Bridge dose', dose: 0.125, reason: 'scheduled' },
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
@@ -442,20 +442,26 @@ function intervalOn(date) {
     if (iv.from <= date) every = iv.every;
   return every;
 }
+// The plan's rules only apply from the plan start date. Earlier days were under different rules:
+// they stay in the log for charts and totals, but the plan engine and warning signs ignore them.
+const inPlan = d => !S.settings.startDate || d >= S.settings.startDate;
+const EMPTY_DAY = { entries: [], total: 0, sleep: false, tremor: false, type: 'off' };
+const planDay = d => inPlan(d) ? dayInfo(d) : EMPTY_DAY;
 function lastDosedBefore(date, maxBack = 120) {
   for (let k = 1; k <= maxBack; k++) {
     const d = addDays(date, -k);
+    if (!inPlan(d)) return null;
     if (dayInfo(d).total > EPS) return d;
   }
   return null;
 }
 function highRunEnding(date) {
   let len = 0, vhigh = false, d = date;
-  while (isHigh(dayInfo(d).type)) { len++; vhigh = vhigh || dayInfo(d).type === 'vhigh'; d = addDays(d, -1); }
+  while (isHigh(planDay(d).type)) { len++; vhigh = vhigh || dayInfo(d).type === 'vhigh'; d = addDays(d, -1); }
   return { len, vhigh };
 }
 function tremorDaysIn(endDate, days) {
-  return new Set(S.entries.filter(e => e.reason === 'tremor' && e.dose > 0 && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date)).size;
+  return new Set(S.entries.filter(e => inPlan(e.date) && e.reason === 'tremor' && e.dose > 0 && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date)).size;
 }
 
 // Another medication yesterday is not counted in totals; the owner decides: off day or 0.125.
@@ -475,7 +481,7 @@ function planCore(date) {
   if (date < st.startDate) return { kind: 'before', head: '—', text: `Plan starts ${fmt(st.startDate)}.` };
   const every = intervalOn(date);
   const L = lastDosedBefore(date);
-  if (!L) return { kind: 'due', head: '0.125', text: 'No doses logged yet. The normal pattern starts with 0.125.' };
+  if (!L) return { kind: 'due', head: '0.125', text: 'Start of the plan: the normal pattern starts with 0.125.' };
   const gap = diffDays(L, date);
   const last = dayInfo(L);
   const notes = [];
@@ -511,7 +517,7 @@ function dueOrLate(due, date, text, notes) {
 }
 
 function sleepDaysIn(endDate, days, extraDate) {
-  const n = new Set(S.entries.filter(e => e.reason === 'sleep' && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date));
+  const n = new Set(S.entries.filter(e => inPlan(e.date) && e.reason === 'sleep' && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date));
   if (extraDate) n.add(extraDate);
   return n.size;
 }
@@ -525,17 +531,17 @@ function checks(date, extra = 0, reason = null) {
   const w = [];
   if (type === 'vhigh') {
     w.push(`${mg(total)} is a very high day. Not part of the plan: ${Math.max(3, intervalOn(date) - 1)} off days follow, then 0.125.`);
-    const n = allDays().filter(d => d !== date && dayInfo(d).type === 'vhigh').length;
+    const n = allDays().filter(d => inPlan(d) && d !== date && dayInfo(d).type === 'vhigh').length;
     if (n >= 1) w.push('WARNING SIGN: more than one very high day. Reassess the plan.');
   } else if (total > 0.25 + EPS && !sleep) {
     w.push('Above 0.25 in a day is only for the sleep exception (extra 0.25 at night, max 0.375).' +
       (Math.abs(cur.total - 0.125) < EPS ? ' Hard day on a 0.125 day: add only 0.125 (total 0.25).' : ''));
   }
-  const prev = dayInfo(addDays(date, -1));
+  const prev = planDay(addDays(date, -1));
   if (type === 'bridge' && prev.type === 'bridge') w.push('Never 0.125 two days in a row.');
   if (isHigh(type)) {
     let len = 1, d = addDays(date, -1);
-    while (isHigh(dayInfo(d).type)) { len++; d = addDays(d, -1); }
+    while (isHigh(planDay(d).type)) { len++; d = addDays(d, -1); }
     if (len >= 4) w.push('4th high day in a row. If the emergency is still going on, get medical advice.');
     if (extra > 0 && reason !== 'sos' && reason !== 'sleep' && !cur.entries.some(e => e.reason === 'sos' || e.reason === 'sleep'))
       w.push('0.25 is only for genuinely acute stress. Pick "Acute stress (SOS)" as the reason if that is what this is.');
@@ -557,7 +563,7 @@ function checks(date, extra = 0, reason = null) {
 
 // Warning signs (spec 6).
 function warningSigns(today) {
-  const days = allDays();
+  const days = allDays().filter(inPlan);
   const tremor30 = tremorDaysIn(today, 30);
   const vhigh = days.filter(d => dayInfo(d).type === 'vhigh').length;
   // 3+ high days within any 7 days that aren't one consecutive run. Report the latest window.
@@ -568,9 +574,13 @@ function warningSigns(today) {
     if (win.length >= 3 && diffDays(win[0], win[win.length - 1]) !== win.length - 1) cluster = highs[i];
   }
   // High-day count per 28-day block ending today: rising two blocks in a row.
-  const block = k => days.filter(d => { const g = diffDays(d, today); return g >= 28 * k && g < 28 * (k + 1) && isHigh(dayInfo(d).type); }).length;
+  // Older blocks that reach back before the plan start are not counted (null); the current block counts plan days so far.
+  const block = k => {
+    if (k > 0 && S.settings.startDate && addDays(today, -(28 * (k + 1) - 1)) < S.settings.startDate) return null;
+    return days.filter(d => { const g = diffDays(d, today); return g >= 28 * k && g < 28 * (k + 1) && isHigh(dayInfo(d).type); }).length;
+  };
   const blocks = [block(2), block(1), block(0)];
-  return { tremor30, vhigh, cluster, blocks, rising: blocks[0] < blocks[1] && blocks[1] < blocks[2] };
+  return { tremor30, vhigh, cluster, blocks, rising: blocks.every(b => b !== null) && blocks[0] < blocks[1] && blocks[1] < blocks[2] };
 }
 function allDays() { return [...new Set(S.entries.map(e => e.date))].sort(); }
 
@@ -1264,7 +1274,7 @@ function renderTrends() {
   const sign = (title, sub, v, flag) => `<div class="sign"><div class="ic ${flag ? 'flagc' : 'okc'}">${flag ? '!' : ICON.check}</div><div class="t">${title}<small>${sub}</small></div><div class="v ${flag ? 'flag' : ''}">${v}</div></div>`;
   const stepIdx = INTERVAL_STEPS.indexOf(every);
   const insight = trendInsight(today);
-  const vhDays = days.filter(d => dayInfo(d).type === 'vhigh'), lastVh = vhDays[vhDays.length - 1];
+  const vhDays = days.filter(d => inPlan(d) && dayInfo(d).type === 'vhigh'), lastVh = vhDays[vhDays.length - 1];
   const days14 = [...Array(14)].map((_, i) => addDays(today, -i));
   const checked14 = days14.filter(d => S.checkins[d] || symOf(d).tags.length || symOf(d).note).length;
   $('#app').innerHTML = `
@@ -1296,11 +1306,11 @@ function renderTrends() {
     </table><p class="entry">* month not finished or started mid-month</p></div>` : ''; })()}
   <div class="card">
     <div class="card-title">Warning signs</div>
-    <div class="entry">From your plan. Red means reassess.</div>
+    <div class="entry">From your plan. Red means reassess. Counted from your plan start (${fmt(S.settings.startDate)}); earlier days are only used for charts.</div>
     ${sign('Tremor doses', 'last 30 days · flag at 2', ws.tremor30, ws.tremor30 >= 2)}
-    ${sign('Very high days', `all time · flag above 1${lastVh ? ' · latest ' + short(lastVh) : ''}`, ws.vhigh, ws.vhigh > 1)}
+    ${sign('Very high days', `since plan start · flag above 1${lastVh ? ' · latest ' + short(lastVh) : ''}`, ws.vhigh, ws.vhigh > 1)}
     ${sign('High-day clusters', '3+ in 7 days, not one run', ws.cluster ? short(ws.cluster) : 'none', !!ws.cluster)}
-    ${sign('High days per 28 days', 'oldest → now · flag if rising twice', ws.blocks.join(' → '), ws.rising)}
+    ${sign('High days per 28 days', 'oldest → now · flag if rising twice', ws.blocks.map(b => b === null ? '–' : b).join(' → '), ws.rising)}
     ${sign('Sleep exceptions', 'last 30 days · max 2', sleep30, sleep30 > 2)}
     <div class="note info">Also reassess if 0.25 stops feeling sufficient or you want more.</div>
   </div>
@@ -1490,11 +1500,11 @@ function logText(range = 'all') {
     }
   }
   const ws = warningSigns(today);
-  lines.push('', 'WARNING SIGNS (per plan)',
+  lines.push('', `WARNING SIGNS (per plan, counted from plan start ${st.startDate})`,
     `Tremor doses, last 30 days: ${ws.tremor30} (flag at 2)`,
-    `Very high days, all time: ${ws.vhigh} (flag above 1)`,
+    `Very high days since plan start: ${ws.vhigh} (flag above 1)`,
     `3+ high days in 7 days, not one run: ${ws.cluster ? 'yes, latest ' + ws.cluster : 'no'}`,
-    `High days per 28-day block, oldest to now: ${ws.blocks.join(', ')}${ws.rising ? ' (rising, flagged)' : ''}`,
+    `High days per 28-day block, oldest to now: ${ws.blocks.map(b => b === null ? 'n/a (before plan start)' : b).join(', ')}${ws.rising ? ' (rising, flagged)' : ''}`,
     `Sleep exceptions, last 30 days: ${sleepDaysIn(today, 30)} (max 2)`);
   if (range === 'all') {
     const ms = monthlyData(today);

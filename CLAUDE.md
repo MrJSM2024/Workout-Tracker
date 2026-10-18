@@ -59,6 +59,8 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
 - Check-ins appear in History, the copied log, and the Widening card (last 14 days).
 
 ## Rules logic (spec v2, from the owner's plan thread; in `planFor()`, `checks()`, `warningSigns()`)
+- The rules apply only from the plan start date (`inPlan()`, `planDay()`). Days before it (owner's earlier routine,
+  Jul 10 to Sep 29) are kept for charts and totals, but the plan engine and warning signs ignore them.
 - Day: a dose before 6 AM, or marked "haven't slept yet", belongs to the previous day.
 - Day types by total: off 0, bridge 0.125, high 0.25 to 0.375, very high above 0.375.
 - After a bridge (scheduled, late or tremor): next 0.125 after the current interval.
