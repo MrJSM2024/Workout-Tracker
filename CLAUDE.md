@@ -61,8 +61,9 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
 - Plan tab (`renderPlan()`): every scenario drawn as a chain by `simulatePattern()`, which runs the real engine on a
   blank simulated state (swaps `S`, restores it in `finally`). Plus widening ladder, hard limits, warning signs.
 - Dose colours (display only, rules still use `dayType()`): `doseLevel()` maps a day total to d125 / d25 / d375 / d5
-  (tokens `--d125` etc. plus `--dX-ink` for chip text). Green for 0.125, then a one-hue violet ramp for 0.25 / 0.375 / 0.5+
-  (darker = more in light mode, lighter = more in dark mode). Validated with the dataviz ordinal + pair checks.
+  (tokens `--d125` etc. plus `--dX-ink` for chip text). Green for 0.125 (on plan), then warm steps: amber 0.25, orange 0.375,
+  deep red 0.5+ (lighter = lower in both modes; owner's choice). All pairs pass the normal-vision check (dataviz validator).
+  Amber cells get a faint inset outline because amber is low-contrast on white.
   Use `doseLegend()` for every legend. Chips, History calendar, day grid and weekly stack all use these.
 - Trends is a dashboard: status line (tap to expand the warning-sign rows), 4 tiles (step tile jumps to Plan), one sticky
   range bar (8 / 16 / All weeks, `chartWeeks`) driving the taper curve, day grid and weekly chart; taper curve has a
