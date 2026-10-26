@@ -60,8 +60,14 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
 - Logging a dose above 0 removes that day's "off" entry (`autoRemoved`); Undo puts it back. Existing data is never auto-cleaned.
 - Plan tab (`renderPlan()`): every scenario drawn as a chain by `simulatePattern()`, which runs the real engine on a
   blank simulated state (swaps `S`, restores it in `finally`). Plus widening ladder, hard limits, warning signs.
-- Trends is a dashboard: status line (warning signs), 4 tiles, taper curve (`taperCurve()`: 28-day rolling mg per 7 days,
-  tap readout), 12-week day grid (`dayGridHtml()`, rough-day dots), weekly mg chart, month table, warning signs, widening.
+- Dose colours (display only, rules still use `dayType()`): `doseLevel()` maps a day total to d125 / d25 / d375 / d5
+  (tokens `--d125` etc. plus `--dX-ink` for chip text). Green for 0.125, then a one-hue violet ramp for 0.25 / 0.375 / 0.5+
+  (darker = more in light mode, lighter = more in dark mode). Validated with the dataviz ordinal + pair checks.
+  Use `doseLegend()` for every legend. Chips, History calendar, day grid and weekly stack all use these.
+- Trends is a dashboard: status line (tap to expand the warning-sign rows), 4 tiles (step tile jumps to Plan), one sticky
+  range bar (8 / 16 / All weeks, `chartWeeks`) driving the taper curve, day grid and weekly chart; taper curve has a
+  7-day / 28-day smoothing toggle (`curveWin`); month table is folded. The widening card lives on the Plan tab
+  (`widenCardHtml()` / `bindWiden()`). Plan folds sleep, tremor and other-med scenarios under "More situations".
 - Check-ins appear in History, the copied log, and the Widening card (last 14 days).
 
 ## Rules logic (spec v2, from the owner's plan thread; in `planFor()`, `checks()`, `warningSigns()`)
