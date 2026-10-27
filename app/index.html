@@ -15,7 +15,7 @@
     --accent: #1f7a4d; --accent-strong: #145a37; --accent-soft: #e3f1e8; --on-accent: #ffffff;
     --warn: #9a5b06; --warn-soft: #fbf0dc; --bad: #b42318; --bad-soft: #fde7e4; --sos: #6d3fd9; --sos-soft: #efe9fd;
     --c-bridge: #16a34a; --c-high: #7c3aed; --grid: #e7e6e1;
-    --d125: #16a34a; --d25: #fda4af; --d375: #e11d48; --d5: #881337; --d125-ink: #fff; --d25-ink: #4c0519; --d375-ink: #fff; --d5-ink: #fff;
+    --d125: #14b8a6; --d25: #3b82f6; --d375: #9333ea; --d5: #9f1239; --d125-text: #0f766e; --d125-ink: #fff; --d25-ink: #fff; --d375-ink: #fff; --d5-ink: #fff;
     --shadow: 0 1px 2px rgba(24,32,27,.05), 0 6px 20px rgba(24,32,27,.06);
     --hero-dose: linear-gradient(150deg, #1f7a4d 0%, #145a37 100%);
     --hero-off: linear-gradient(150deg, #ffffff 0%, #f1f4f1 100%);
@@ -26,7 +26,7 @@
       --accent: #4cc38a; --accent-strong: #2f9e68; --accent-soft: #15301f; --on-accent: #062012;
       --warn: #f2b53c; --warn-soft: #33270b; --bad: #f38b80; --bad-soft: #3a1714; --sos: #a78bfa; --sos-soft: #251c40;
       --c-bridge: #16a34a; --c-high: #8b5cf6; --grid: #252c27;
-      --d125: #16a34a; --d25: #fda4af; --d375: #f43f5e; --d5: #9f1239; --d125-ink: #fff; --d25-ink: #4c0519; --d375-ink: #fff; --d5-ink: #fff;
+      --d125: #2dd4bf; --d25: #60a5fa; --d375: #a855f7; --d5: #e11d48; --d125-text: #2dd4bf; --d125-ink: #0b2530; --d25-ink: #fff; --d375-ink: #fff; --d5-ink: #fff;
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
       --hero-dose: linear-gradient(150deg, #1d6b45 0%, #10432a 100%);
       --hero-off: linear-gradient(150deg, #1a201c 0%, #151a17 100%);
@@ -316,10 +316,10 @@
   .pc.d5 { background: var(--d5); color: var(--d5-ink); }
   .pc.off { border: 2px solid var(--line); color: var(--muted); font-weight: 700; font-size: 12px; }
   .pc.note { border-style: dotted; font-size: 11px; }
-  .pc.or { border: 2px dashed var(--c-bridge); color: var(--c-bridge); }
+  .pc.or { border: 2px dashed var(--d125); color: var(--d125-text); }
   .pc.missed { border: 2px dashed var(--bad); color: var(--bad); font-size: 10px; }
   .pc.unl { border: 2px dashed var(--warn); color: var(--warn); }
-  .planned .pc.d125 { background: transparent; border: 2px dashed var(--d125); color: var(--d125); }
+  .planned .pc.d125 { background: transparent; border: 2px dashed var(--d125); color: var(--d125-text); }
   .planned .pc.off { border-style: dashed; }
   .pchip .cap { font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
   .pchip.today .pc { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--text); }
@@ -375,7 +375,7 @@
   .dgrid .wl { font-size: 10px; color: var(--faint); font-weight: 600; white-space: nowrap; }
   .dc { aspect-ratio: 1; border: 0; border-radius: 6px; background: var(--raised); position: relative; padding: 0; box-shadow: inset 0 0 0 1px var(--line); }
   .dc.d125 { background: var(--d125); box-shadow: none; }
-  .dc.d25 { background: var(--d25); box-shadow: inset 0 0 0 1px rgba(136,19,55,.22); }
+  .dc.d25 { background: var(--d25); box-shadow: none; }
   .dc.d375 { background: var(--d375); box-shadow: none; }
   .dc.d5 { background: var(--d5); box-shadow: none; }
   .dc.gap { background: transparent; box-shadow: none; outline: 1.5px dashed var(--warn); outline-offset: -2px; }
@@ -415,7 +415,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-27a';
+const APP_VERSION = '2026-10-27b';
 const PRESETS = {
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
