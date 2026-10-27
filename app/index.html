@@ -966,12 +966,20 @@ function renderToday() {
     ${sym.tags.length || sym.note ? `<input id="sym-note" placeholder="Add a note (optional)" value="${esc(sym.note)}">` : ''}
     <div class="overall"><span>Overall</span>${Object.keys(FEEL_SHORT).map(k => `<button class="ov ${k} ${feel === k ? 'sel' : ''}" data-feel="${k}" aria-pressed="${feel === k}">${FEEL_SHORT[k]}</button>`).join('')}</div>
   </div>
+  <div class="card">
+    <div class="card-title">Log a different dose</div>
+    <div class="chips">
+      ${['sos', 'sleep', 'late', 'othermed'].map(k => `<button class="chip-btn" data-preset="${k}"><b>${PRESETS[k].label}</b><span>${PRESETS[k].sub}</span></button>`).join('')}
+      <button class="chip-btn more" data-preset="custom" style="grid-column: span 2"><b>Other amount</b><span>Any dose</span></button>
+    </div>
+  </div>
   ${logged ? `<div class="card tappable" data-day="${today}"><div class="label">Today's entries · tap to edit</div>${info.entries.map(entryHtml).join('')}</div>` : ''}
   ${backupLine}
   <div style="height:64px"></div>
   <button class="fab" id="fab" aria-label="Log a dose">${ICON.plus}Log</button>`;
 
   $('#fab').onclick = () => openLog();
+  document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => openLog({ preset: b.dataset.preset }));
   document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => {
     const k = b.dataset.feel;
     if (S.checkins[today] === k) delete S.checkins[today]; else S.checkins[today] = k;
