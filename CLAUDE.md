@@ -66,10 +66,10 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   the normal-vision check (dataviz validator). `--d125-text` is a darker teal for dashed planned/"or off" chip labels.
   Use `doseLegend()` for every legend. Chips, History calendar, day grid and weekly stack all use these.
 - Trends is a dashboard: status line (tap to expand the warning-sign rows), 4 tiles (step tile jumps to Plan), one sticky
-  range bar (8 / 16 / All weeks, `chartWeeks`) driving the taper curve, day grid and weekly chart; taper curve (`curveData()`) draws the
-  28-day average bold with the 7-day average faint behind it (no toggle), shades days before the plan start, marks plan
-  start and widening steps, dots 0.5+ days, and has big headline numbers (`taperSummary()`: 28-day average vs 4 weeks
-  earlier, dose-free days in the last 28 vs the 28 before); month table is folded. The widening card lives on the Plan tab
+  range bar (8 / 16 / All weeks, `chartWeeks`) driving the taper curve, day grid and weekly chart; taper curve is one clean line like a price chart
+  (owner's preference: no extra lines, dots or markers) with 1W / 2W / 3W / 4W averaging toggles (`curveWin`, default 21
+  days: almost as smooth as 4W on the owner's every-other-day rhythm, reacts a week sooner), a big current value and the
+  change over the visible range; month table is folded. The widening card lives on the Plan tab
   (`widenCardHtml()` / `bindWiden()`). Plan folds sleep, tremor and other-med scenarios under "More situations".
 - Check-ins appear in History, the copied log, and the Widening card (last 14 days).
 
