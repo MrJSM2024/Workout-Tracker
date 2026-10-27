@@ -208,9 +208,9 @@
   .chart.curve text { font-size: 12px; }
   .chart.curve .val.big { font-size: 15px; font-weight: 800; }
   .taper-head { margin: 8px 0 10px; }
-  .curve-ctl { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
-  .curve-ctl .rangebar { margin: 0; }
-  .curve-ctl .rangebar + .rangebar .rng { padding-left: 14px; padding-right: 14px; }
+  .curve-title { display: flex; justify-content: space-between; align-items: center; }
+  .pct-toggle { min-width: 44px; height: 32px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--raised); color: var(--muted); font: inherit; font-size: 15px; font-weight: 800; }
+  .pct-toggle.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .big-num { font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .big-num small { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
   .taper-head .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
@@ -425,7 +425,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-27e';
+const APP_VERSION = '2026-10-27f';
 const PRESETS = {
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
@@ -1504,7 +1504,8 @@ function taperCurve(today, win = 28, weeks = 0) {
   return pts;
 }
 // Taper curve: one line, like a price chart. `curveWin` = averaging window in days (7 / 14 / 21 / 28).
-const CURVE = { W: 320, H: 190, L: 38, Rt: 44, T: 14, B: 24 };
+const CURVE_MG = { W: 320, H: 190, L: 30, Rt: 44, T: 12, B: 24 }, CURVE_PCT = { ...CURVE_MG, L: 38, T: 14 };
+let CURVE = CURVE_MG;
 // Starting point for the % view: average mg per week over the first 4 logged weeks.
 function taperBaseline() {
   const f = firstLogged(); if (!f || diffDays(f, logicalToday()) < 27) return null;
@@ -1639,6 +1640,7 @@ function renderTrends() {
   const d7 = full ? roll.cur.total - roll.prev.total : 0;
   const base = taperBaseline();
   if (!base && isPct()) curveUnit = 'mg';
+  CURVE = isPct() ? CURVE_PCT : CURVE_MG;
   const pts = taperCurve(today, curveWin, chartWeeks).map(p => ({ ...p, mg: p.v, v: isPct() ? (base.v - p.v) / base.v * 100 : p.v }));
   const chg = pts.length > 1 ? pts[pts.length - 1].v - pts[0].v : null;
   const rangeName = chartWeeks ? `past ${chartWeeks} weeks` : `since ${short(pts.length ? pts[0].date : today)}`;
@@ -1668,7 +1670,7 @@ function renderTrends() {
   </div>
   ${allWeeks > 8 ? `<div class="sticky-range">${seg('data-rng', chartWeeks, [[8, '8 weeks'], [16, '16 weeks'], [0, 'All']])}</div>` : ''}
   <div class="card">
-    <div class="card-title">Taper curve</div>
+    <div class="card-title curve-title">Taper curve${base ? `<button class="pct-toggle ${isPct() ? 'on' : ''}" id="pct-toggle" aria-pressed="${isPct()}">%</button>` : ''}</div>
     ${pts.length > 1 ? (isPct() ? (() => { const v = pts[pts.length - 1].v; return `<div class="taper-head">
       <div class="big-num">${Math.round(Math.abs(v))}%<small> ${v >= 0 ? 'less' : 'more'}</small></div>
       <div class="sub">than your first 4 weeks · ${num(+base.v.toFixed(2))} → ${num(+pts[pts.length - 1].mg.toFixed(2))} mg / week</div>
@@ -1676,7 +1678,7 @@ function renderTrends() {
       <div class="big-num">${num(+pts[pts.length - 1].v.toFixed(2))}<small> mg / week</small></div>
       <div class="sub">${Math.abs(chg) < 0.005 ? 'No change' : `<b class="chg">${chg < 0 ? '▼' : '▲'} ${num(+Math.abs(chg).toFixed(2))}${pts[0].v > EPS ? ` (${chg < 0 ? '−' : '+'}${Math.round(Math.abs(chg) / pts[0].v * 100)}%)` : ''}</b>`} ${rangeName}</div>
     </div>`) : ''}
-    <div class="curve-ctl">${seg('data-win', curveWin, [[7, '1W'], [14, '2W'], [21, '3W'], [28, '4W']])}${base ? seg('data-unit', curveUnit, [['mg', 'mg'], ['pct', '%']]) : ''}</div>
+    ${seg('data-win', curveWin, [[7, '1W'], [14, '2W'], [21, '3W'], [28, '4W']])}
     ${curveHtml(pts)}
     <div class="readout" id="curve-readout">${pts.length > 1 ? curveRead(pts[pts.length - 1]) + '. Tap the chart to see any day.' : ''}</div>
   </div>
@@ -1705,7 +1707,7 @@ function renderTrends() {
   $('#to-plan').onclick = () => { tab = 'plan'; render(); setTimeout(() => { const c = $('#widen-card'); if (c) c.scrollIntoView({ block: 'start' }); }, 50); };
   document.querySelectorAll('[data-rng]').forEach(b => b.onclick = () => { chartWeeks = +b.dataset.rng; renderTrends(); });
   document.querySelectorAll('[data-win]').forEach(b => b.onclick = () => { curveWin = +b.dataset.win; renderTrends(); });
-  document.querySelectorAll('[data-unit]').forEach(b => b.onclick = () => { curveUnit = b.dataset.unit; renderTrends(); });
+  if ($('#pct-toggle')) $('#pct-toggle').onclick = () => { curveUnit = isPct() ? 'mg' : 'pct'; renderTrends(); };
   document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
     document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));
     $('#wk-readout').innerHTML = weekReadout(weeks[+h.dataset.wk]);

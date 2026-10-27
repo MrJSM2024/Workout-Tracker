@@ -69,7 +69,7 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   range bar (8 / 16 / All weeks, `chartWeeks`) driving the taper curve, day grid and weekly chart; taper curve is one clean line like a price chart
   (owner's preference: no extra lines, dots or markers) with 1W / 2W / 3W / 4W averaging toggles (`curveWin`, default 21
   days: almost as smooth as 4W on the owner's every-other-day rhythm, reacts a week sooner), a big current value and the
-  change over the visible range. An mg / % toggle (`curveUnit`) switches the same line to "% less than your first 4 logged
+  change over the visible range. A single % switch beside the card title (`curveUnit`) switches the same line to "% less than your first 4 logged
   weeks" (`taperBaseline()`); mg stays the default; month table is folded. The widening card lives on the Plan tab
   (`widenCardHtml()` / `bindWiden()`). Plan folds sleep, tremor and other-med scenarios under "More situations".
 - Check-ins appear in History, the copied log, and the Widening card (last 14 days).
