@@ -441,7 +441,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-28b';
+const APP_VERSION = '2026-10-28c';
 const PRESETS = {
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
@@ -620,13 +620,15 @@ function planCore(date) {
     if (every === 0) return { kind: 'off', head: 'Off', text: `Interval is none. No 0.125 follows the ${mg(last.total)} day on ${fmt(L)}.`, notes };
     const off = Math.max(run.vhigh ? 3 : 2, every - 1);
     if (run.vhigh && gap <= off) notes.push({ cls: 'info', t: `After a very high day: ${off} off days, then 0.125.` });
-    // Owner's option: after 2 or more high days in a row, a 3rd off day is allowed (from bridge start + 21, no tremor dose in 14 days).
+    // Owner's rule: a 3rd off day is an option after 2 high days in a row adding up to 0.625 or more, or 3 high days in a row.
+    // (A single day of 0.5+ already gives 3 off days by default.) 0.125 days don't count.
     const choiceDay = addDays(L, off + 1);
-    const skipOk = run.len >= 2 && off === 2 && choiceDay >= unlockSkip3() && tremorDaysIn(addDays(choiceDay, -1), 14) === 0;
+    let runTotal = 0; for (let i = 0; i < run.len; i++) runTotal += dayInfo(addDays(L, -i)).total;
+    const skipOk = off === 2 && (run.len >= 3 || (run.len === 2 && runTotal >= 0.625 - EPS));
     const tookExtra = skipOk && dayInfo(choiceDay).entries.some(e => e.reason === 'off') && date > choiceDay;
     const offN = tookExtra ? off + 1 : off;
     if (gap <= offN) return { kind: 'off', head: 'Off', text: `Off day ${gap} of ${offN} after ${mg(last.total)} on ${fmt(L)}. Next 0.125: ${fmt(addDays(L, offN + 1))}${skipOk && !tookExtra ? ' (or a 3rd off day, your call)' : ''}.`, notes };
-    if (skipOk && date === choiceDay) return { kind: 'due', head: '0.125 or off', skip3: true, text: `After ${run.len} high days in a row you may take a 3rd off day instead. Your call.`, notes };
+    if (skipOk && date === choiceDay) return { kind: 'due', head: '0.125 or off', skip3: true, text: run.len >= 3 ? `After ${run.len} high days in a row you may take a 3rd off day instead. Your call.` : `After ${mg(runTotal)} over 2 days you may take a 3rd off day instead. Your call.`, notes };
     return dueOrLate(addDays(L, offN + 1), date, `Bridge 0.125 after the ${mg(last.total)} day.`, notes);
   }
 
@@ -880,8 +882,9 @@ function renderPlan() {
   <div class="section-h">Patterns</div>
   ${card('Normal', 'No hard days: a 0.125 bridge, an off day, repeat.', simulatePattern([B], { every: 2, cycles: 2 }))}
   ${card('Hard day', 'Acute stress: 0.25, two off days, then back to 0.125.', simulatePattern([H('SOS')]))}
-  ${card('Hard 2 days', 'Same stress the next day: 0.25 again, then two off days.', simulatePattern([H('SOS'), H('SOS')]), [`From ${fmt(unlockSkip3())}, if no tremor dose in 14 days: a 3rd off day is OK. Your call.`])}
-  ${card('Hard 3 days, same emergency', 'Three days of 0.25 at most.', simulatePattern([H('SOS'), H('SOS'), H('SOS')]), ['No 4th day of 0.25. If the emergency is still going on day 4, get medical advice.', `From ${fmt(unlockSkip3())}, if off days have felt fine and no tremor dose in 14 days: 3 off days is OK.`])}
+  ${card('Hard 2 days', 'Same stress the next day: 0.25 again, then two off days.', simulatePattern([H('SOS'), H('SOS')]))}
+  ${card('2 days adding up to 0.625 or more', 'For example 0.375 + 0.25, in either order. 2 off days, and a 3rd off day is OK. Your call.', simulatePattern([{ dose: 0.375, reason: 'sleep', cap: '0.125 + 0.25' }, H('SOS')]))}
+  ${card('Hard 3 days, same emergency', 'Three days of 0.25 at most.', simulatePattern([H('SOS'), H('SOS'), H('SOS')]), ['No 4th day of 0.25. If the emergency is still going on day 4, get medical advice.', 'A 3rd off day is OK. Your call.'])}
   ${card('Hard day during the off days', 'The new 0.25 restarts the count.', simulatePattern([H('SOS'), OFF, H('SOS')]))}
   ${card('Hard day on a 0.125 day', 'Take 0.25 instead, not both. Already took the 0.125? Add 0.125 more (total 0.25).', simulatePattern([H('instead')]))}
   ${card('Missed a 0.125', 'Take it when you remember, same day or next. The count restarts from that day. Never double up.', simulatePattern([B, OFF, { dose: 0, missed: true }], { cycles: 2 }))}

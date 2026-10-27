@@ -84,9 +84,11 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
 - Day types by total: off 0, bridge 0.125, high 0.25 to 0.375, very high above 0.375.
 - After a bridge (scheduled, late or tremor): next 0.125 after the current interval.
 - After a high run: off days = max(2, interval - 1); with a very high day: max(3, interval - 1). Then 0.125.
-- After a run of 2 or more high days (proposed Oct 28, awaiting owner's OK; on the working branch only): default 2 off;
-  a 3rd off day is offered from bridge start + 21 if no tremor dose in the last 14 days. On that day the plan is
+- 3rd off day (owner's rule, Oct 28): a single day of 0.5+ gives 3 off days by default (very high rule). A 3rd off day is
+  an OPTION after 2 high days in a row adding up to 0.625 or more (e.g. 0.375 + 0.25, either order) or 3 high days in a
+  row; anything less is 2 off days; 0.125 days don't count. No date or tremor conditions. On the choice day the plan is
   "0.125 or off" (`skip3`, hero button "3rd off day"); an off entry that day counts as planned, so no "late" next day.
+  Only applies where off days would be 2 (interval every 2 or 3).
 - Interval "none": no scheduled 0.125, nothing follows a high day.
 - Tremor dose: warn if any dose yesterday.
 - "Other medication" entries (reason othermed) are notes only: dose 0, amount + name in the note.
