@@ -205,6 +205,17 @@
   .chart svg { width: 100%; height: auto; display: block; }
   .chart text { fill: var(--muted); font-size: 10px; }
   .chart .val { fill: var(--text); font-weight: 700; }
+  .chart.curve text { font-size: 12px; }
+  .chart.curve .lbl { font-size: 11px; font-weight: 700; }
+  .chart.curve .val.big { font-size: 15px; font-weight: 800; }
+  .taper-head { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin: 10px 0 12px; }
+  .big-num { font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .big-num.sm { font-size: 26px; }
+  .big-num small { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
+  .taper-head .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .taper-head .chg { color: var(--text); }
+  .legend i.ln { width: 16px; height: 3px; border-radius: 2px; background: var(--accent); }
+  .legend i.ln.thin { height: 1.5px; background: var(--muted); opacity: .7; }
   .chart .hit { fill: transparent; cursor: pointer; }
   .chart .bg { fill: transparent; }
   .chart .bg.on { fill: var(--grid); opacity: .6; }
@@ -415,7 +426,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-27b';
+const APP_VERSION = '2026-10-27c';
 const PRESETS = {
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
@@ -675,7 +686,7 @@ const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let tab = 'today';
 let lastTab = null;
-let chartWeeks = 16, histAll = false, curveWin = 28;
+let chartWeeks = 16, histAll = false;
 let justSaved = false;
 
 function render() {
@@ -1493,41 +1504,74 @@ function taperCurve(today, win = 28, weeks = 0) {
   }
   return pts;
 }
-const CURVE = { W: 340, H: 170, L: 30, Rt: 40, T: 16, B: 22 };
+// Taper curve: bold 28-day average with the 7-day average faint behind it, both in mg per week.
+const CURVE = { W: 320, H: 200, L: 30, Rt: 44, T: 22, B: 24 };
+function curveData(today, weeks) {
+  const p7 = taperCurve(today, 7, weeks), p28 = taperCurve(today, 28, weeks);
+  const v28 = new Map(p28.map(p => [p.date, p.v]));
+  return p7.map(p => ({ date: p.date, v7: p.v, v28: v28.has(p.date) ? v28.get(p.date) : null }));
+}
+function curveScale(pts) {
+  const { W, H, L, Rt, T, B } = CURVE, pw = W - L - Rt, ph = H - T - B;
+  const max = Math.max(...pts.map(p => Math.max(p.v7, p.v28 || 0)), 0.5), step = max <= 1 ? 0.25 : max <= 2.5 ? 0.5 : 1, top = Math.ceil(max / step) * step;
+  return { pw, ph, step, top, x: i => L + (i / (pts.length - 1)) * pw, y: v => T + ph - (v / top) * ph };
+}
 function curveHtml(pts) {
   if (pts.length < 2) return '<p class="entry">Not enough days logged for this view yet.</p>';
-  const { W, H, L, Rt, T, B } = CURVE, pw = W - L - Rt, ph = H - T - B;
-  const max = Math.max(...pts.map(p => p.v), 0.5), step = max <= 1 ? 0.25 : 0.5, top = Math.ceil(max / step) * step;
-  const x = i => L + (i / (pts.length - 1)) * pw, y = v => T + ph - (v / top) * ph;
+  const { W, H, L, Rt, T } = CURVE, { pw, ph, step, top, x, y } = curveScale(pts);
+  const idx = new Map(pts.map((p, i) => [p.date, i]));
   let g = '';
-  for (let v = 0; v <= top + EPS; v += step) g += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${num(v)}</text>`;
+  // before-plan shading, plan start and widening markers
+  const st = S.settings.startDate, first = pts[0].date, last = pts[pts.length - 1].date;
+  if (st && st > first) {
+    const xe = st > last ? x(pts.length - 1) : x(idx.get(st));
+    g += `<rect x="${L}" y="${T}" width="${xe - L}" height="${ph}" fill="var(--raised)"/>`;
+    if (xe - L > 70) g += `<text class="lbl" x="${L + 6}" y="${T + 13}">before plan</text>`;
+  }
+  const marks = [[st, 'plan start'], ...S.settings.intervals.filter(iv => iv.from > st).map(iv => [iv.from, intervalName(iv.every)])];
+  marks.forEach(([d, l]) => { if (idx.has(d)) { const xm = x(idx.get(d)); g += `<line x1="${xm}" x2="${xm}" y1="${T}" y2="${T + ph}" stroke="var(--muted)" stroke-dasharray="3 3" stroke-width="1"/><text class="lbl" x="${xm + 4}" y="${T - 7}">${esc(l)}</text>`; } });
+  for (let v = 0; v <= top + EPS; v += step) g += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 5}" y="${y(v) + 4}" text-anchor="end">${num(v)}</text>`;
   const months = pts.filter(p => p.date.slice(8) === '01').length;
   pts.forEach((p, i) => {
     if (months >= 2 ? p.date.slice(8) === '01' : (pts.length - 1 - i) % 14 === 0 && i > 3)
-      g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${months >= 2 ? parse(p.date).toLocaleDateString(undefined, { month: 'short' }) : short(p.date)}</text>`;
+      g += `<text x="${x(i)}" y="${H - 5}" text-anchor="middle">${months >= 2 ? parse(p.date).toLocaleDateString(undefined, { month: 'short' }) : short(p.date)}</text>`;
   });
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
-  g += `<path d="${line}L${x(pts.length - 1).toFixed(1)},${y(0)}L${x(0)},${y(0)}Z" fill="var(--accent)" fill-opacity=".1"/>`;
-  g += `<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
-  const li = pts.length - 1, lv = pts[li].v;
-  g += `<circle cx="${x(li)}" cy="${y(lv)}" r="4" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/><text class="val" x="${x(li) + 7}" y="${y(lv) + 4}">${num(+lv.toFixed(2))}</text>`;
-  g += `<text class="val" x="${x(0)}" y="${y(pts[0].v) - 8}" text-anchor="start">${num(+pts[0].v.toFixed(2))}</text>`;
-  g += `<g id="cx" style="display:none"><line id="cxl" y1="${T}" y2="${T + ph}" stroke="var(--muted)" stroke-width="1"/><circle id="cxc" r="5" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/></g>`;
+  const path = key => { let d = '', on = false; pts.forEach((p, i) => { if (p[key] === null) { on = false; return; } d += `${on ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`; on = true; }); return d; };
+  g += `<path d="${path('v7')}" fill="none" stroke="var(--muted)" stroke-opacity=".55" stroke-width="1.5" stroke-linejoin="round"/>`;
+  const l28 = path('v28');
+  if (l28) {
+    const i0 = pts.findIndex(p => p.v28 !== null);
+    g += `<path d="${l28}L${x(pts.length - 1).toFixed(1)},${y(0)}L${x(i0).toFixed(1)},${y(0)}Z" fill="var(--accent)" fill-opacity=".08"/>`;
+    g += `<path d="${l28}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  // 0.5+ days as dots on the 7-day line
+  pts.forEach((p, i) => { if (doseLevel(dayInfo(p.date).total) === 'd5') g += `<circle cx="${x(i)}" cy="${y(p.v7)}" r="3.5" fill="var(--d5)" stroke="var(--card)" stroke-width="1.5"/>`; });
+  const li = pts.length - 1, lv = pts[li].v28 !== null ? pts[li].v28 : pts[li].v7;
+  g += `<circle cx="${x(li)}" cy="${y(lv)}" r="5" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/><text class="val big" x="${x(li) + 8}" y="${y(lv) + 5}">${num(+lv.toFixed(2))}</text>`;
+  g += `<g id="cx" style="display:none"><line id="cxl" y1="${T}" y2="${T + ph}" stroke="var(--text)" stroke-opacity=".5" stroke-width="1"/><circle id="cxc" r="5" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/></g>`;
   g += `<rect id="cx-hit" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/>`;
-  return `<div class="chart"><svg id="curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Taper curve: average mg per 7 days over the 28 days up to each day">${g}</svg></div>`;
+  return `<div class="chart curve"><svg id="curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Taper curve: milligrams per week, 28-day and 7-day averages">${g}</svg></div>`;
 }
+const curveRead = p => `<b>${fmt(p.date)}:</b> ${p.v28 !== null ? `28-day average <b>${num(+p.v28.toFixed(2))}</b> · ` : ''}7-day <b>${num(+p.v7.toFixed(2))}</b> mg per week`;
 function bindCurve(pts) {
   const svg = $('#curve'); if (!svg || pts.length < 2) return;
-  const { W, H, L, Rt, T, B } = CURVE, pw = W - L - Rt, ph = H - T - B;
-  const max = Math.max(...pts.map(p => p.v), 0.5), step = max <= 1 ? 0.25 : 0.5, top = Math.ceil(max / step) * step;
+  const { W, L } = CURVE, { pw, x, y } = curveScale(pts);
   const show = i => {
-    const p = pts[i], cx = L + (i / (pts.length - 1)) * pw, cy = T + ph - (p.v / top) * ph;
-    $('#cx').style.display = ''; $('#cxl').setAttribute('x1', cx); $('#cxl').setAttribute('x2', cx); $('#cxc').setAttribute('cx', cx); $('#cxc').setAttribute('cy', cy);
-    $('#curve-readout').innerHTML = `<b>${fmt(p.date)}:</b> ${num(+p.v.toFixed(3))} mg per 7 days (${curveWin}-day average)`;
+    const p = pts[i], v = p.v28 !== null ? p.v28 : p.v7;
+    $('#cx').style.display = ''; $('#cxl').setAttribute('x1', x(i)); $('#cxl').setAttribute('x2', x(i)); $('#cxc').setAttribute('cx', x(i)); $('#cxc').setAttribute('cy', y(v));
+    $('#curve-readout').innerHTML = curveRead(p);
   };
   const at = ev => { const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) / r.width * W; show(Math.max(0, Math.min(pts.length - 1, Math.round((sx - L) / pw * (pts.length - 1))))); };
   const hit = $('#cx-hit');
   hit.addEventListener('pointerdown', at); hit.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'mouse') at(e); });
+}
+// Headline numbers for the taper card: current 28-day average vs 4 weeks earlier, and dose-free days.
+function taperSummary(today) {
+  const all = curveData(today, 0).filter(p => p.v28 !== null);
+  if (!all.length) return null;
+  const now = all[all.length - 1], ago = all.find(p => p.date === addDays(now.date, -28));
+  const free = (from, n) => { let f = 0, logged = 0; for (let i = 0; i < n; i++) { const d = addDays(from, -i), info = dayInfo(d); if (info.entries.length) { logged++; if (info.total <= EPS) f++; } } return { f, logged }; };
+  return { now, ago, free: free(now.date, 28), freePrev: free(addDays(now.date, -28), 28) };
 }
 function dayGridHtml(today, weeks = 12) {
   const f = firstLogged();
@@ -1614,7 +1658,8 @@ function renderTrends() {
   if (sleep30 > 2) reds.push('sleep exceptions');
   const full = roll && roll.cur.days === 7 && roll.prev.days === 7;
   const d7 = full ? roll.cur.total - roll.prev.total : 0;
-  const pts = taperCurve(today, curveWin, chartWeeks);
+  const pts = curveData(today, chartWeeks), ts = taperSummary(today);
+  const chg = ts && ts.ago ? ts.now.v28 - ts.ago.v28 : null;
   const feel14 = { ok: 0, some: 0, rough: 0 };
   days14.forEach(d => { const f = S.checkins[d]; if (f) feel14[f]++; });
   const nFeel = feel14.ok + feel14.some + feel14.rough;
@@ -1642,10 +1687,15 @@ function renderTrends() {
   ${allWeeks > 8 ? `<div class="sticky-range">${seg('data-rng', chartWeeks, [[8, '8 weeks'], [16, '16 weeks'], [0, 'All']])}</div>` : ''}
   <div class="card">
     <div class="card-title">Taper curve</div>
-    <div class="entry">mg per 7 days, smoothed. Going down means you are tapering.</div>
-    ${seg('data-win', curveWin, [[7, '7-day average'], [28, '28-day average']])}
+    ${ts ? `<div class="taper-head">
+      <div><div class="big-num">${num(+ts.now.v28.toFixed(2))}<small> mg / week</small></div>
+        <div class="sub">average, last 28 days${chg !== null ? `<br><b class="chg">${Math.abs(chg) < 0.005 ? 'same as' : (chg < 0 ? '▼ ' : '▲ ') + num(+Math.abs(chg).toFixed(2))}</b> vs 4 weeks ago` : ''}</div></div>
+      <div><div class="big-num sm">${ts.free.f}<small> of ${ts.free.logged}</small></div>
+        <div class="sub">dose-free days${ts.freePrev.logged ? `<br>${ts.freePrev.f} in the 28 before` : ''}</div></div>
+    </div>` : ''}
+    <div class="legend"><span><i class="ln"></i>28-day average</span><span><i class="ln thin"></i>7-day average</span><span><i style="background:var(--d5);border-radius:50%"></i>0.5+ day</span></div>
     ${curveHtml(pts)}
-    <div class="readout" id="curve-readout">${pts.length > 1 ? `<b>Now:</b> ${num(+pts[pts.length - 1].v.toFixed(3))} mg per 7 days. Tap the chart to see any day.` : ''}</div>
+    <div class="readout" id="curve-readout">${pts.length > 1 ? curveRead(pts[pts.length - 1]) + '. Tap the chart to see any day.' : ''}</div>
   </div>
   <div class="card">
     <div class="card-title">Every day</div>
@@ -1671,7 +1721,6 @@ function renderTrends() {
   bindCurve(pts);
   $('#to-plan').onclick = () => { tab = 'plan'; render(); setTimeout(() => { const c = $('#widen-card'); if (c) c.scrollIntoView({ block: 'start' }); }, 50); };
   document.querySelectorAll('[data-rng]').forEach(b => b.onclick = () => { chartWeeks = +b.dataset.rng; renderTrends(); });
-  document.querySelectorAll('[data-win]').forEach(b => b.onclick = () => { curveWin = +b.dataset.win; renderTrends(); });
   document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
     document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));
     $('#wk-readout').innerHTML = weekReadout(weeks[+h.dataset.wk]);
