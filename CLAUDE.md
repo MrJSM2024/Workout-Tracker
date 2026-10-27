@@ -35,8 +35,9 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   Today shows a one-at-a-time catch-up card for unlogged days in the last 7 (`gapDays()`); answers: took 0.125,
   off day, other, skip (`S.skipped[date]`), or mark all as off. The plan engine treats unlogged days as off, so
   the hero warns when gaps exist.
-- Daily check-in = feeling (`S.checkins[date]`: ok/some/rough) + tags and note (`S.symptoms[date] = {tags, note}`;
-  tags from `SYMPTOM_TAGS`, canonical order). Shown in History, day sheet, Trends (14-day counts) and the copied log.
+- Daily check-in = morning reasons + note (`S.symptoms[date] = {tags, note}`; tags from `SYMPTOM_TAGS`, canonical order:
+  Slept badly, Dreading the day, In pain, Anxious now, Stressful event, Other; old names mapped in `migrate()` via `OLD_TAGS`)
+  plus an "Overall" row (`S.checkins[date]`: ok/some/rough, shown as OK / So-so / Rough). Shown in History, day sheet, Trends (14-day counts) and the copied log.
 - Backup: after the share sheet returns, the app asks "Did the backup save?" and only records `lastBackup` on yes.
   Today shows backup age plus entries added since (`e.at > lastBackup`). Use `logicalOf()` for any date derived from a
   timestamp (6 AM day cutoff), never `slice(0, 10)`.
@@ -55,7 +56,8 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   pattern chain (`currentCycle()` + `chainHtml()`): from the last dose (whole high run) to the next 0.125, with
   today ringed and planned days dashed (from `projection()`, simulated, never saved). Off runs of 4+ collapse to "off ×N".
 - Today: one-tap "I took 0.125" / "Confirm off day" from the plan card, undo toast after every save,
-  daily check-in (faces first; tags and note appear once a face is picked), and a floating "+ Log" button
+  a "What's going on this morning?" card (six large reason buttons in a 2x3 grid, multi-select, always visible; note box
+  appears once a reason is picked; small Overall row at the bottom), and a floating "+ Log" button
   that opens `openLog()` (PRESETS order: SOS first, tremor last).
 - Logging a dose above 0 removes that day's "off" entry (`autoRemoved`); Undo puts it back. Existing data is never auto-cleaned.
 - Plan tab (`renderPlan()`): every scenario drawn as a chain by `simulatePattern()`, which runs the real engine on a
