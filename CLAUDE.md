@@ -19,8 +19,9 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
 
 ## Data
 - Stored only in the phone's localStorage (key `doselog.v1`). Nothing is sent anywhere.
-- Backup: Settings → Back up shares a JSON file (owner picks Google Drive). Restore
-  reads it back. Export CSV is for the prescriber.
+- Backup: Back up shares `dose-log-backup-DATE.txt` (JSON inside, text/plain) so Chrome on Android opens the share
+  sheet directly (it refuses to share .json files and fell back to a download). Owner picks Drive, taps Save. Restore
+  accepts .txt and older .json backups. Export CSV is for the prescriber.
 - Repo is public: keep the medication name and any personal data OUT of the code.
   The display name is typed into the app and stored locally.
 

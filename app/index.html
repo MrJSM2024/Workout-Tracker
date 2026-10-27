@@ -441,7 +441,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-28c';
+const APP_VERSION = '2026-10-28d';
 const PRESETS = {
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
@@ -1763,7 +1763,7 @@ function renderSettings() {
       <button class="tile" id="copy">${ICON.copy}<span>Copy log<br><small>Paste into a chat</small></span></button>
       <button class="tile" id="csv">${ICON.csv}<span>Export CSV<br><small>For your prescriber</small></span></button>
       <button class="tile" id="restore" style="grid-column:span 2;flex-direction:row;align-items:center">${ICON.restore}<span>Restore from a backup file</span></button>
-      <input type="file" id="file" accept=".json,application/json" class="hidden">
+      <input type="file" id="file" accept=".json,.txt,application/json,text/plain" class="hidden">
     </div>
   </div>
   <div class="card"><div class="card-title">Plan settings</div>
@@ -1847,8 +1847,9 @@ async function shareOrDownload(name, text, type) {
   return true;
 }
 async function backup() {
-  const name = `dose-log-backup-${logicalToday()}.json`;
-  const ok = await shareOrDownload(name, JSON.stringify({ app: 'doselog', version: 1, exportedAt: new Date().toISOString(), data: S }, null, 2), 'application/json');
+  // Saved as .txt (same JSON inside): Chrome on Android only shares certain file types, and .json is not one of them.
+  const name = `dose-log-backup-${logicalToday()}.txt`;
+  const ok = await shareOrDownload(name, JSON.stringify({ app: 'doselog', version: 1, exportedAt: new Date().toISOString(), data: S }, null, 2), 'text/plain');
   if (!ok) return;
   const saved = await askConfirm({ title: 'Did the backup save?', sub: 'In Drive you have to tap Save. If you saw it upload, or can find the file in Drive, choose yes.', ok: 'Yes, it saved', cancel: 'No, not saved' });
   if (saved) { S.settings.lastBackup = new Date().toISOString(); save(); render(); buzz(); showToast('Backup recorded'); }
