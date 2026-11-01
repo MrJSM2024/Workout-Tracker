@@ -59,7 +59,7 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
 - Today: one-tap "I took 0.125" / "Confirm off day" from the plan card, undo toast after every save,
   a "What's going on this morning?" card (six large reason buttons in a 2x3 grid, multi-select, always visible; note box
   appears once a reason is picked; small Overall row at the bottom), a visible "Log a different dose" card (preset chips:
-  SOS, sleep, late, other med, other amount), and a floating "+ Log" button
+  SOS, 0 mg off day, sleep, late, other med, other amount; the `off` preset saves a 0 mg off entry for any date), and a floating "+ Log" button
   that opens `openLog()` (PRESETS order: SOS first, tremor last).
 - Logging a dose above 0 removes that day's "off" entry (`autoRemoved`); Undo puts it back. Existing data is never auto-cleaned.
 - Plan tab (`renderPlan()`): every scenario drawn as a chain by `simulatePattern()`, which runs the real engine on a

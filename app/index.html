@@ -439,9 +439,10 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-11-01';
+const APP_VERSION = '2026-11-01b';
 const PRESETS = {
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
+  off:      { label: '0 mg', sub: 'Off day', dose: 0, reason: 'off' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
   late:     { label: '0.125', sub: 'Late dose', dose: 0.125, reason: 'late' },
   bridge:   { label: '0.125', sub: 'Bridge dose', dose: 0.125, reason: 'scheduled' },
@@ -998,8 +999,8 @@ function renderToday() {
   <div class="card">
     <div class="card-title">Log a different dose</div>
     <div class="chips">
-      ${['sos', 'sleep', 'late', 'othermed'].map(k => `<button class="chip-btn" data-preset="${k}"><b>${PRESETS[k].label}</b><span>${PRESETS[k].sub}</span></button>`).join('')}
-      <button class="chip-btn more" data-preset="custom" style="grid-column: span 2"><b>Other amount</b><span>Any dose</span></button>
+      ${['sos', 'off', 'sleep', 'late', 'othermed'].map(k => `<button class="chip-btn" data-preset="${k}"><b>${PRESETS[k].label}</b><span>${PRESETS[k].sub}</span></button>`).join('')}
+      <button class="chip-btn more" data-preset="custom"><b>Other amount</b><span>Any dose</span></button>
     </div>
   </div>
   ${logged ? `<div class="card tappable" data-day="${today}"><div class="label">Today's entries · tap to edit</div>${info.entries.map(entryHtml).join('')}</div>` : ''}
@@ -1186,7 +1187,7 @@ function openLog(opts = {}) {
   };
   const warnings = () => {
     const d = doseOf(), r = reasonOf();
-    if (!(d > 0) || !lg.date || r === 'othermed') return [];
+    if (!(d > 0) || !lg.date || r === 'othermed' || r === 'off') return [];
     return checks(lg.date, d, r);
   };
   const updateWarn = () => {
@@ -1210,7 +1211,7 @@ function openLog(opts = {}) {
           <label class="f" style="display:flex;gap:10px;align-items:center;color:var(--text)">
             <input id="lg-noslept" type="checkbox" style="width:22px;height:22px;margin:0" ${lg.noSleep ? 'checked' : ''}> Haven't slept yet (counts for the previous day)</label>
           <label class="f">Date (before 6 AM counts as the previous day)<input id="lg-date" type="date" value="${lg.date}" max="${ymd(new Date())}"></label>
-          ${p.reason === 'othermed' ? '' : `<label class="f">Reason<select id="lg-reason">${REASON_CHOICES.map(k => `<option value="${k}" ${reasonOf() === k ? 'selected' : ''}>${REASONS[k]}</option>`).join('')}</select></label>`}
+          ${p.reason === 'othermed' || p.reason === 'off' ? '' : `<label class="f">Reason<select id="lg-reason">${REASON_CHOICES.map(k => `<option value="${k}" ${reasonOf() === k ? 'selected' : ''}>${REASONS[k]}</option>`).join('')}</select></label>`}
         </details>
         <div id="lg-err"></div><div id="lg-warn"></div>
         <div class="sheet-actions"><button class="primary" id="lg-save">Save</button></div>` : '<div class="empty">Pick what you took.</div>'}`);
@@ -1225,9 +1226,15 @@ function openLog(opts = {}) {
   const save_ = () => {
     sync();
     const d = doseOf(), r = reasonOf();
-    if (!(d > 0)) return err('Enter an amount in mg.');
     if (!lg.date) return err('Pick a date.');
     if (lg.date > ymd(new Date())) return err('That date is in the future.');
+    if (r === 'off') {
+      if (dayInfo(lg.date).entries.some(e => e.reason === 'off')) return err('This day is already logged as an off day.');
+      const id = addEntry({ date: lg.date, dose: 0, reason: 'off', note: lg.note.trim() });
+      sh.close(); buzz(); showToast(`Saved: off day (0 mg)${lg.date !== today ? ' on ' + fmt(lg.date) : ' today'}`, () => removeEntry(id));
+      return;
+    }
+    if (!(d > 0)) return err('Enter an amount in mg.');
     if (r === 'othermed') {
       if (!lg.note.trim()) return err('Type the medication name.');
       const id = addEntry({ date: lg.date, dose: 0, reason: 'othermed', note: `${num(d)} mg ${lg.note.trim()}` });
