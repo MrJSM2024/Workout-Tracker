@@ -209,8 +209,6 @@
   .chart.curve .val.big { font-size: 15px; font-weight: 800; }
   .taper-head { margin: 8px 0 10px; }
   .curve-title { display: flex; justify-content: space-between; align-items: center; }
-  .pct-toggle { min-width: 44px; height: 32px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--raised); color: var(--muted); font: inherit; font-size: 15px; font-weight: 800; }
-  .pct-toggle.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .big-num { font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .big-num small { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
   .taper-head .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
@@ -441,7 +439,7 @@ const REASONS = {
   other: 'Other',
 };
 const FEELINGS = { ok: 'OK', some: 'Some symptoms', rough: 'Rough' };
-const APP_VERSION = '2026-10-28d';
+const APP_VERSION = '2026-11-01';
 const PRESETS = {
   sos:      { label: '0.25', sub: 'SOS, acute stress', dose: 0.25, reason: 'sos' },
   sleep:    { label: '0.25', sub: 'Sleep exception', dose: 0.25, reason: 'sleep' },
@@ -499,6 +497,9 @@ const INTERVAL_STEPS = [2, 3, 4, 7, 0]; // 0 = none
 const intervalName = n => n === 0 ? 'none (medication-free)' : n === 2 ? 'every other day' : n === 7 ? 'weekly' : `every ${n}${n === 3 ? 'rd' : 'th'} day`;
 
 const BRIDGE_START = '2026-09-30';
+const PHASE3_START = '2026-11-01';
+const PHASE3_STEPS = [['2026-11-16', 4], ['2026-11-30', 7], ['2026-12-14', 0]]; // earliest dates, 14 days apart
+const STEP_DAYS = 14;
 function migrate(s) {
   const st = s.settings;
   // Earlier check-in tag names map onto the morning reasons.
@@ -513,6 +514,14 @@ function migrate(s) {
     delete st.widenEarliest; delete st.threeOffFrom;
     st.rulesVersion = 2;
   }
+  if (st.rulesVersion < 3) {
+    // Rules v3 (Nov 1, 2026): every 3rd day from today, later steps start on their own dates.
+    if (st.startDate) {
+      st.intervals = (st.intervals || []).filter(i => i.from < PHASE3_START);
+      st.intervals.push({ from: PHASE3_START, every: 3 }, ...PHASE3_STEPS.map(([from, every]) => ({ from, every, auto: true })));
+    }
+    st.rulesVersion = 3;
+  }
   if (!s.checkins || typeof s.checkins !== 'object') s.checkins = {};
   if (!s.symptoms || typeof s.symptoms !== 'object') s.symptoms = {};
   if (!s.skipped || typeof s.skipped !== 'object') s.skipped = {};
@@ -523,7 +532,7 @@ function load() {
     const s = JSON.parse(localStorage.getItem(KEY));
     if (s && Array.isArray(s.entries)) return migrate(s);
   } catch (e) {}
-  return { entries: [], checkins: {}, symptoms: {}, skipped: {}, settings: { medName: 'My medicine', startDate: null, intervals: [], lastBackup: null, rulesVersion: 2 } };
+  return { entries: [], checkins: {}, symptoms: {}, skipped: {}, settings: { medName: 'My medicine', startDate: null, intervals: [], lastBackup: null, rulesVersion: 3 } };
 }
 let S = load();
 function save() {
@@ -543,8 +552,6 @@ const DAY_CUTOFF_HOUR = 6;
 function logicalOf(when) { const d = new Date(when); if (d.getHours() < DAY_CUTOFF_HOUR) d.setDate(d.getDate() - 1); return ymd(d); }
 function logicalToday() { return logicalOf(Date.now()); }
 const mg = n => `${+n.toFixed(4)} mg`;
-const unlockSkip3 = () => addDays(S.settings.startDate, 21);
-const widenEarliest = () => addDays(S.settings.startDate, 14);
 
 // ---------- derived data ----------
 function dayInfo(date) {
@@ -566,6 +573,22 @@ function intervalOn(date) {
     if (iv.from <= date) every = iv.every;
   return every;
 }
+// Steps: the current one and the planned ones after it (auto: true). A planned step starts on its date by itself;
+// "Hold" pushes every planned step back a week. High days never change the step.
+function stepPlan(today) {
+  const ivs = [...S.settings.intervals].sort((a, b) => a.from.localeCompare(b.from));
+  const past = ivs.filter(i => i.from <= today), cur = past[past.length - 1];
+  const from = cur ? cur.from : S.settings.startDate;
+  return { every: intervalOn(today), from, held: from ? diffDays(from, today) : 0, upcoming: ivs.filter(i => i.from > today) };
+}
+// Start step `every` on `from` and plan the remaining steps 14 days apart.
+function scheduleSteps(from, every) {
+  const st = S.settings;
+  st.intervals = st.intervals.filter(i => i.from < from);
+  st.intervals.push({ from, every });
+  INTERVAL_STEPS.slice(INTERVAL_STEPS.indexOf(every) + 1).forEach((n, k) => st.intervals.push({ from: addDays(from, STEP_DAYS * (k + 1)), every: n, auto: true }));
+}
+function shiftSteps(today, days) { S.settings.intervals.forEach(i => { if (i.from > today) i.from = addDays(i.from, days); }); }
 // The plan's rules only apply from the plan start date. Earlier days were under different rules:
 // they stay in the log for charts and totals, but the plan engine and warning signs ignore them.
 const inPlan = d => !S.settings.startDate || d >= S.settings.startDate;
@@ -580,10 +603,17 @@ function lastDosedBefore(date, maxBack = 120) {
   return null;
 }
 function highRunEnding(date) {
-  let len = 0, vhigh = false, d = date;
-  while (isHigh(planDay(d).type)) { len++; vhigh = vhigh || dayInfo(d).type === 'vhigh'; d = addDays(d, -1); }
-  return { len, vhigh };
+  let len = 0, d = date;
+  while (isHigh(planDay(d).type)) { len++; d = addDays(d, -1); }
+  return { len };
 }
+// The high run ending on `d` counts as heavy when it is 2+ days long or any day in it is above 0.25.
+function heavyRun(d) {
+  const run = highRunEnding(d);
+  if (run.len >= 2) return true;
+  return run.len === 1 && dayInfo(d).total > 0.25 + EPS;
+}
+const offDaysAfter = (d, every) => Math.max(heavyRun(d) ? 3 : 2, every - 1);
 function tremorDaysIn(endDate, days) {
   return new Set(S.entries.filter(e => inPlan(e.date) && e.reason === 'tremor' && e.dose > 0 && e.date <= endDate && diffDays(e.date, endDate) < days).map(e => e.date)).size;
 }
@@ -618,18 +648,12 @@ function planCore(date) {
     }
     // Spec 2: at interval "none", nothing follows a high day.
     if (every === 0) return { kind: 'off', head: 'Off', text: `Interval is none. No 0.125 follows the ${mg(last.total)} day on ${fmt(L)}.`, notes };
-    const off = Math.max(run.vhigh ? 3 : 2, every - 1);
-    if (run.vhigh && gap <= off) notes.push({ cls: 'info', t: `After a very high day: ${off} off days, then 0.125.` });
-    // Owner's rule: a 3rd off day is an option after 2 high days in a row adding up to 0.625 or more, or 3 high days in a row.
-    // (A single day of 0.5+ already gives 3 off days by default.) 0.125 days don't count.
-    const choiceDay = addDays(L, off + 1);
-    let runTotal = 0; for (let i = 0; i < run.len; i++) runTotal += dayInfo(addDays(L, -i)).total;
-    const skipOk = off === 2 && (run.len >= 3 || (run.len === 2 && runTotal >= 0.625 - EPS));
-    const tookExtra = skipOk && dayInfo(choiceDay).entries.some(e => e.reason === 'off') && date > choiceDay;
-    const offN = tookExtra ? off + 1 : off;
-    if (gap <= offN) return { kind: 'off', head: 'Off', text: `Off day ${gap} of ${offN} after ${mg(last.total)} on ${fmt(L)}. Next 0.125: ${fmt(addDays(L, offN + 1))}${skipOk && !tookExtra ? ' (or a 3rd off day, your call)' : ''}.`, notes };
-    if (skipOk && date === choiceDay) return { kind: 'due', head: '0.125 or off', skip3: true, text: run.len >= 3 ? `After ${run.len} high days in a row you may take a 3rd off day instead. Your call.` : `After ${mg(runTotal)} over 2 days you may take a 3rd off day instead. Your call.`, notes };
-    return dueOrLate(addDays(L, offN + 1), date, `Bridge 0.125 after the ${mg(last.total)} day.`, notes);
+    // Rules v3: a single 0.25 day gives 2 off days. More than 0.25 in a day (sleep exception included)
+    // or 2+ high days in a row gives 3. At wider steps, off days are at least interval − 1.
+    const off = offDaysAfter(L, every);
+    if (heavyRun(L) && gap <= off) notes.push({ cls: 'info', t: `${run.len >= 2 ? `${run.len} high days in a row` : `More than 0.25 on ${fmt(L)}`}: ${off} off days, then 0.125.` });
+    if (gap <= off) return { kind: 'off', head: 'Off', text: `Off day ${gap} of ${off} after ${mg(last.total)} on ${fmt(L)}. Next 0.125: ${fmt(addDays(L, off + 1))}.`, notes };
+    return dueOrLate(addDays(L, off + 1), date, `Bridge 0.125 after the ${mg(last.total)} day.`, notes);
   }
 
   // last dose was a 0.125 bridge (scheduled, late or tremor: all restart the count)
@@ -717,7 +741,7 @@ const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let tab = 'today';
 let lastTab = null;
-let chartWeeks = 16, histAll = false, curveWin = 21, curveUnit = 'mg';
+let chartWeeks = 16, histAll = false, curveWin = 0; // 0 = pick from the current step (WIN_FOR)
 let justSaved = false;
 
 function render() {
@@ -856,14 +880,16 @@ function simulatePattern(forced, { every = 2, cycles = 1 } = {}) {
     return chips;
   } finally { S = real; }
 }
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
 const capFirst = t => t.charAt(0).toUpperCase() + t.slice(1);
 function renderPlan() {
   const today = logicalToday(), p = planFor(today), every = intervalOn(today);
   const cyc = currentCycle(today);
   const H = cap => ({ dose: 0.25, reason: 'sos', cap }), OFF = { dose: 0 }, B = { dose: 0.125 };
   const card = (title, when, chips, notes = []) => `<div class="card pcard"><div class="card-title">${title}</div>${when ? `<div class="entry">${when}</div>` : ''}${chainHtml(chips)}${notes.map(t => `<div class="pnote">${esc(t)}</div>`).join('')}</div>`;
-  const ex = every > 2 ? every : 4;
-  const rule = (t, w) => `<div class="rule"><span class="ic ${w ? 'w' : ''}">!</span><span>${t}</span></div>`;
+  const pe = every || 7; // pattern examples at "none" use weekly spacing
+  const off1 = Math.max(2, pe - 1), off2 = Math.max(3, pe - 1);
+  const rule =(t, w) => `<div class="rule"><span class="ic ${w ? 'w' : ''}">!</span><span>${t}</span></div>`;
   const headline = p.kind === 'due' ? (p.head.includes(' or ') ? '0.125 or off today' : '0.125 today') : p.kind === 'off' ? 'Off day today' : `Plan starts ${fmt(S.settings.startDate)}`;
   $('#app').innerHTML = `
   <section class="card now">
@@ -880,29 +906,23 @@ function renderPlan() {
     <div class="keyrow">${chipHtml({ dose: 0 })}<span><b>Off = medication-free.</b> Lets the residual drug come down.</span></div>
   </div>
   <div class="section-h">Patterns</div>
-  ${card('Normal', 'No hard days: a 0.125 bridge, an off day, repeat.', simulatePattern([B], { every: 2, cycles: 2 }))}
-  ${card('Hard day', 'Acute stress: 0.25, two off days, then back to 0.125.', simulatePattern([H('SOS')]))}
-  ${card('Hard 2 days', 'Same stress the next day: 0.25 again, then two off days.', simulatePattern([H('SOS'), H('SOS')]))}
-  ${card('2 days adding up to 0.625 or more', 'For example 0.375 + 0.25, in either order. 2 off days, and a 3rd off day is OK. Your call.', simulatePattern([{ dose: 0.375, reason: 'sleep', cap: '0.125 + 0.25' }, H('SOS')]))}
-  ${card('Hard 3 days, same emergency', 'Three days of 0.25 at most.', simulatePattern([H('SOS'), H('SOS'), H('SOS')]), ['No 4th day of 0.25. If the emergency is still going on day 4, get medical advice.', 'A 3rd off day is OK. Your call.'])}
-  ${card('Hard day during the off days', 'The new 0.25 restarts the count.', simulatePattern([H('SOS'), OFF, H('SOS')]))}
-  ${card('Hard day on a 0.125 day', 'Take 0.25 instead, not both. Already took the 0.125? Add 0.125 more (total 0.25).', simulatePattern([H('instead')]))}
-  ${card('Missed a 0.125', 'Take it when you remember, same day or next. The count restarts from that day. Never double up.', simulatePattern([B, OFF, { dose: 0, missed: true }], { cycles: 2 }))}
+  <div class="pnote" style="margin:-4px 4px 10px">Shown for ${intervalName(pe)}${every ? ', your current step' : ''}.</div>
+  ${every ? card('Normal', `No hard days: a 0.125 bridge, ${WORDS[pe - 1]} off day${pe > 2 ? 's' : ''}, repeat.`, simulatePattern([B], { every: pe, cycles: 2 })) : ''}
+  ${card('Hard day', `Acute stress: 0.25, ${WORDS[off1]} off days, then back to 0.125.`, simulatePattern([H('SOS')], { every: pe }))}
+  ${card('Hard 2 days', `Same stress the next day: 0.25 again, then ${WORDS[off2]} off days.`, simulatePattern([H('SOS'), H('SOS')], { every: pe }))}
+  ${card('More than 0.25 in a day', `For example 0.125 in the morning and 0.25 at night for sleep (0.375): ${WORDS[off2]} off days, then 0.125.`, simulatePattern([{ dose: 0.375, reason: 'sleep', cap: '0.125 + 0.25' }], { every: pe }))}
+  ${card('Hard 3 days, same emergency', `Three days of 0.25 at most, then ${WORDS[off2]} off days.`, simulatePattern([H('SOS'), H('SOS'), H('SOS')], { every: pe }), ['No 4th day of 0.25. If the emergency is still going on day 4, get medical advice.'])}
+  ${card('Hard day during the off days', 'The new 0.25 restarts the count. Two hard days close together but not in a row still count as single hard days.', simulatePattern([H('SOS'), OFF, H('SOS')], { every: pe }))}
+  ${card('Hard day on a 0.125 day', 'Take 0.25 instead, not both. Already took the 0.125? Add 0.125 more (total 0.25).', simulatePattern([H('instead')], { every: pe }))}
+  ${card('Missed a 0.125', 'Take it when you remember, same day or next. The count restarts from that day. Never double up.', simulatePattern([B, ...Array(pe - 1).fill(OFF), { dose: 0, missed: true }], { every: pe, cycles: 2 }))}
   <details class="more"><summary>More situations: sleep, tremor, other medication</summary>
-  ${card("Can't sleep, no dose yet today", 'Acute stress keeping you up: 0.25 at night.', simulatePattern([{ dose: 0.25, reason: 'sleep', cap: 'night' }]), ["Until you've slept, it's still the same day (before 6 AM counts as the day before).", 'Not two nights in a row. Max twice in 30 days.'])}
-  ${card("Can't sleep, took 0.125 this morning", '0.25 at night, total 0.375 for the day.', simulatePattern([{ dose: 0.375, reason: 'sleep', cap: '0.125 + 0.25' }]))}
-  ${card("Can't sleep, took 0.25 this morning", 'Not part of the plan. If it happens anyway (total 0.5): skip 3 days.', simulatePattern([{ dose: 0.5, reason: 'sleep', cap: '0.25 + 0.25' }]))}
-  ${card('Tremor, tingling or twitching', 'On an off day with no stressful trigger: 0.125, unless there was any dose yesterday. It restarts the count.', simulatePattern([H('SOS'), OFF, { dose: 0.125, reason: 'tremor', cap: 'tremor' }]))}
-  ${card('Other medication day', 'Logged as a note, not counted. The next due day is your call: 0.125 or off.', simulatePattern([B, { dose: 0, reason: 'othermed', note: 'other medication', cap: 'other med' }]))}
+  ${card("Can't sleep, no dose yet today", 'Acute stress keeping you up: 0.25 at night.', simulatePattern([{ dose: 0.25, reason: 'sleep', cap: 'night' }], { every: pe }), ["Until you've slept, it's still the same day (before 6 AM counts as the day before).", 'Not two nights in a row. Max twice in 30 days.'])}
+  ${card("Can't sleep, took 0.25 this morning", `Not part of the plan. If it happens anyway (total 0.5): ${WORDS[off2]} off days.`, simulatePattern([{ dose: 0.5, reason: 'sleep', cap: '0.25 + 0.25' }], { every: pe }))}
+  ${card('Tremor, tingling or twitching', 'On an off day with no stressful trigger: 0.125, unless there was any dose yesterday. It restarts the count.', simulatePattern([H('SOS'), OFF, { dose: 0.125, reason: 'tremor', cap: 'tremor' }], { every: pe }))}
+  ${card('Other medication day', 'Logged as a note, not counted. The next due day is your call: 0.125 or off.', simulatePattern([B, { dose: 0, reason: 'othermed', note: 'other medication', cap: 'other med' }], { every: pe }))}
   </details>
-  <div class="section-h">Widening ladder</div>
-  <div class="card">
-    <div class="entry">One step at a time, only when off days have felt fine for 2 weeks. Hold each step at least 14 days. Earliest first widening: ${fmt(widenEarliest())}. High days never change the step.</div>
-    ${[2, 3, 4, 7].map(n => `<div class="ladder ${n === every ? 'cur' : ''}"><div class="lh"><b>${capFirst(intervalName(n))}</b>${n === every ? '<span class="here">You are here</span>' : ''}</div>${chainHtml(simulatePattern([B], { every: n }))}</div>`).join('')}
-    <div class="ladder ${every === 0 ? 'cur' : ''}"><div class="lh"><b>None</b>${every === 0 ? '<span class="here">You are here</span>' : ''}</div><div class="entry" style="margin-top:6px">No scheduled doses. A hard day is followed only by off days.</div></div>
-  </div>
-  ${widenCardHtml(today)}
-  ${card(`Hard day at ${intervalName(ex)}`, `0.25, then off for 2 days or your current interval, whichever is longer, then 0.125.${every > 2 ? '' : ' (Example for when you widen.)'}`, simulatePattern([H('SOS')], { every: ex }))}
+  <div class="section-h">Steps</div>
+  ${stepsCardHtml(today)}
   <div class="section-h">Hard limits</div>
   <div class="card">
     ${rule('Never above 0.25 in a day. Exception: 0.375 when the extra 0.25 is at night for sleep.')}
@@ -920,7 +940,7 @@ function renderPlan() {
     ${rule('Tremor, tingling or twitching keeps returning on off days (2 or more in 30 days).', 1)}
   </div>
   <p class="entry" style="text-align:center;margin:18px 8px 6px">These chains are produced by the same rules the app uses, so they always match what Today tells you.</p>`;
-  bindWiden(today);
+  bindSteps(today);
 }
 
 function renderToday() {
@@ -938,6 +958,10 @@ function renderToday() {
   const feel = S.checkins[today];
   const cycle = currentCycle(today);
   const logged = info.entries.length > 0;
+  const sp = stepPlan(today), nextStep = sp.upcoming[0];
+  const stepNote = nextStep && diffDays(today, nextStep.from) <= 2
+    ? { cls: 'info', t: `${diffDays(today, nextStep.from) === 1 ? 'From tomorrow' : 'From ' + fmt(nextStep.from)}: ${intervalName(nextStep.every)}. Off days not feeling right? Hold a week on the Plan tab.` }
+    : sp.held === 0 && sp.from !== S.settings.startDate ? { cls: 'info', t: `New step from today: ${intervalName(sp.every)}.` } : null;
   const choice = p.head.includes(' or ');
   const heroCls = logged ? 'done' : p.kind === 'due' ? 'dose' : 'off';
   const pop = justSaved;
@@ -947,7 +971,7 @@ function renderToday() {
   else if (p.kind === 'off') title = 'Off day';
   else title = '—';
   if (!logged && p.kind === 'due')
-    quick = `<div class="quick"><button class="btn-hero" id="q-take">I took 0.125</button>${choice ? `<button class="btn-hero ghost" id="q-off">${p.skip3 ? '3rd off day' : 'Off today'}</button>` : ''}</div>`;
+    quick = `<div class="quick"><button class="btn-hero" id="q-take">I took 0.125</button>${choice ? `<button class="btn-hero ghost" id="q-off">Off today</button>` : ''}</div>`;
   else if (!logged && p.kind === 'off')
     quick = `<div class="quick"><button class="btn-hero" id="q-off">Confirm off day</button></div>`;
 
@@ -958,7 +982,7 @@ function renderToday() {
     <div class="eyebrow">${logged ? 'Logged today' : 'Plan for today'}</div>
     <h2>${title}</h2>
     <div class="sub">${esc(p.text)}</div>
-    ${(p.notes || []).map(n => `<div class="chip ${n.cls === 'info' ? '' : n.cls}">${esc(n.t)}</div>`).join('')}
+    ${[...(p.notes || []), ...(stepNote ? [stepNote] : [])].map(n => `<div class="chip ${n.cls === 'info' ? '' : n.cls}">${esc(n.t)}</div>`).join('')}
     ${gaps.length ? '<div class="chip warn">Earlier days are not logged, so this plan may change. Catch up above.</div>' : ''}
     ${logged ? `<div class="done-badge ${pop ? 'pop' : ''}">${ICON.check} Saved for ${fmt(today)}</div>` : ''}
     ${quick}
@@ -1527,6 +1551,47 @@ function monthlyData(today) {
     return { ...m, per7: m.counted ? m.total / m.counted * 7 : 0, partial: m.days < dim, label: new Date(y, mo - 1, 1).toLocaleDateString(undefined, { month: 'short' }) };
   });
 }
+// "Is it working?": dose days and mg this month vs last month. A month in progress is compared with the same days
+// of last month (1st to the last logged day), so a half month is never set against a whole one.
+function monthCheck(today) {
+  const f = firstLogged(); if (!f) return null;
+  const end = dayInfo(today).entries.length ? today : addDays(today, -1);
+  const [y, m, d] = end.split('-').map(Number);
+  const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1, dim = new Date(y, m, 0).getDate(), pdim = new Date(py, pm, 0).getDate();
+  const full = d === dim;
+  const sum = (yy, mm, n) => {
+    const from = `${yy}-${pad(mm)}-01`, to = `${yy}-${pad(mm)}-${pad(n)}`;
+    let dosed = 0, total = 0, unlogged = 0;
+    for (let x = from; x <= to; x = addDays(x, 1)) {
+      const info = dayInfo(x); total += info.total;
+      if (info.total > EPS) dosed++;
+      if (!info.entries.length && x >= f && x < today && !S.skipped[x]) unlogged++;
+    }
+    return { from, to, dosed, total, unlogged };
+  };
+  const prevFrom = `${py}-${pad(pm)}-01`;
+  if (prevFrom < f) return null; // last month is not fully in the log
+  const cur = sum(y, m, d), prev = sum(py, pm, full ? pdim : Math.min(d, pdim));
+  return { cur, prev, full };
+}
+function monthCheckHtml(today) {
+  const c = monthCheck(today); if (!c) return '';
+  const { cur, prev, full } = c;
+  const span = x => `${short(x.from)}${x.to !== x.from ? '–' + parse(x.to).getDate() : ''}`;
+  const arrow = (a, b) => Math.abs(a - b) < EPS ? '<small class="delta">same</small>' : `<small class="delta">${a < b ? '▼' : '▲'} from ${num(b)}</small>`;
+  const down = cur.dosed < prev.dosed && cur.total < prev.total - EPS;
+  const up = cur.dosed >= prev.dosed && cur.total >= prev.total - EPS && (cur.dosed > prev.dosed || cur.total > prev.total + EPS);
+  const verdict = down ? 'Both going down: the taper is working.' : up ? 'Up from last month. One month is not a trend; watch the next one.' : 'Not both down yet. One month is not a trend.';
+  return `<div class="card"><div class="card-title">Is it working?</div>
+    <div class="entry">${full ? 'Last full month' : 'This month so far'} (${span(cur)}) vs ${full ? 'the month before' : 'the same days last month'} (${span(prev)}).</div>
+    <div class="tiles4" style="margin:10px 0 8px">
+      <div class="kpi"><b>${cur.dosed}</b><span>Dose days</span>${arrow(cur.dosed, prev.dosed)}</div>
+      <div class="kpi"><b>${num(cur.total)}<small> mg</small></b><span>Total</span>${arrow(cur.total, prev.total)}</div>
+    </div>
+    ${noteHtml({ cls: down ? 'ok' : 'info', t: verdict })}
+    ${cur.unlogged + prev.unlogged ? `<p class="entry">${cur.unlogged + prev.unlogged} day${cur.unlogged + prev.unlogged > 1 ? 's' : ''} in these ranges not logged, so the counts may be low.</p>` : ''}
+  </div>`;
+}
 
 // mg per 7 days, averaged over the `win` days up to each day; `weeks` = 0 shows everything.
 function taperCurve(today, win = 28, weeks = 0) {
@@ -1543,29 +1608,22 @@ function taperCurve(today, win = 28, weeks = 0) {
   return pts;
 }
 // Taper curve: one line, like a price chart. `curveWin` = averaging window in days (7 / 14 / 21 / 28).
-const CURVE_MG = { W: 320, H: 190, L: 30, Rt: 44, T: 12, B: 24 }, CURVE_PCT = { ...CURVE_MG, L: 38, T: 14 };
-let CURVE = CURVE_MG;
-// Starting point for the % view: average mg per week over the first 4 logged weeks.
-function taperBaseline() {
-  const f = firstLogged(); if (!f || diffDays(f, logicalToday()) < 27) return null;
-  let sum = 0; for (let i = 0; i < 28; i++) sum += dayInfo(addDays(f, i)).total;
-  return sum > EPS ? { v: sum / 4, from: f, to: addDays(f, 27) } : null;
-}
-const isPct = () => curveUnit === 'pct';
-const cfmt = v => isPct() ? `${Math.round(v)}%` : num(+v.toFixed(2));
+const CURVE = { W: 320, H: 190, L: 30, Rt: 44, T: 12, B: 24 };
+// Default window per step: a whole number of dose cycles, so a steady schedule draws a flat line instead of a zigzag
+// (every 3rd day: 21 days = 7 cycles; every 4th: 28 = 7 cycles). Every other day keeps the owner's 3W pick.
+const WIN_FOR = { 2: 21, 3: 21, 4: 28, 7: 14, 0: 28 };
+const cfmt = v => num(+v.toFixed(2));
 function curveScale(pts) {
   const { W, H, L, Rt, T, B } = CURVE, pw = W - L - Rt, ph = H - T - B;
   const vs = pts.map(p => p.v), hi = Math.max(...vs), lo = Math.min(...vs);
-  let step, bot, top;
-  if (isPct()) { step = hi - Math.min(0, lo) > 60 ? 20 : 10; bot = Math.floor(Math.min(0, lo) / step) * step; top = Math.max(step, Math.ceil(hi / step) * step); }
-  else { const max = Math.max(hi, 0.5); step = max <= 1 ? 0.25 : max <= 2.5 ? 0.5 : 1; bot = 0; top = Math.ceil(max / step) * step; }
+  const max = Math.max(hi, 0.5), step = max <= 1 ? 0.25 : max <= 2.5 ? 0.5 : 1, bot = 0, top = Math.ceil(max / step) * step;
   return { pw, ph, step, top, bot, x: i => L + (i / (pts.length - 1)) * pw, y: v => T + ph - ((v - bot) / (top - bot)) * ph };
 }
 function curveHtml(pts) {
   if (pts.length < 2) return '<p class="entry">Not enough days logged for this view yet.</p>';
   const { W, H, L, Rt, T } = CURVE, { pw, ph, step, top, bot, x, y } = curveScale(pts);
   let g = '<defs><linearGradient id="cfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>';
-  for (let v = bot; v <= top + EPS; v += step) g += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 5}" y="${y(v) + 4}" text-anchor="end">${isPct() ? (v < 0 ? '−' : '') + Math.abs(v) + '%' : num(v)}</text>`;
+  for (let v = bot; v <= top + EPS; v += step) g += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 5}" y="${y(v) + 4}" text-anchor="end">${num(v)}</text>`;
   const months = pts.filter(p => p.date.slice(8) === '01').length;
   pts.forEach((p, i) => {
     if (months >= 2 ? p.date.slice(8) === '01' : (pts.length - 1 - i) % 14 === 0 && i > 3)
@@ -1580,7 +1638,7 @@ function curveHtml(pts) {
   g += `<rect id="cx-hit" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/>`;
   return `<div class="chart curve"><svg id="curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Taper curve: milligrams per week, ${curveWin / 7}-week average">${g}</svg></div>`;
 }
-const curveRead = p => `<b>${fmt(p.date)}:</b> ${isPct() ? `${Math.round(p.v)}% less than your first 4 weeks (${num(+p.mg.toFixed(2))} mg per week)` : `${num(+p.v.toFixed(2))} mg per week`} · ${curveWin / 7}-week average`;
+const curveRead = p => `<b>${fmt(p.date)}:</b> ${num(+p.v.toFixed(2))} mg per week · ${curveWin / 7}-week average`;
 function bindCurve(pts) {
   const svg = $('#curve'); if (!svg || pts.length < 2) return;
   const { W, L } = CURVE, { pw, x, y } = curveScale(pts);
@@ -1610,49 +1668,29 @@ function dayGridHtml(today, weeks = 12) {
   }
   return h + '</div>';
 }
-function widenState(today) {
-  const st = S.settings, every = intervalOn(today);
-  const ivs = [...st.intervals].sort((a, b) => a.from.localeCompare(b.from));
-  const curFrom = ivs.length ? ivs[ivs.length - 1].from : st.startDate;
-  const held = diffDays(curFrom, today), tremor14 = tremorDaysIn(today, 14);
-  const next = INTERVAL_STEPS[INTERVAL_STEPS.indexOf(every) + 1];
-  const warn = [];
-  if (today < widenEarliest()) warn.push(`Earliest first widening is ${fmt(widenEarliest())}.`);
-  if (held < 14) warn.push(`Only ${held} days at the current step (needs 14).`);
-  if (tremor14 > 0) warn.push(`${tremor14} tremor dose${tremor14 > 1 ? 's' : ''} in the last 14 days.`);
-  return { every, ivs, held, next, warn };
-}
-function widenCardHtml(today) {
-  const { every, ivs, held, next, warn } = widenState(today);
-  const stepIdx = INTERVAL_STEPS.indexOf(every);
+const stepName = n => n === 0 ? 'None' : capFirst(intervalName(n));
+function stepsCardHtml(today) {
+  const { every, from, held, upcoming } = stepPlan(today);
   const feel14 = { ok: 0, some: 0, rough: 0 };
   for (let i = 0; i < 14; i++) { const f = S.checkins[addDays(today, -i)]; if (f) feel14[f]++; }
-  const stat = (k, v) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`;
+  const chain = n => n ? chainHtml(simulatePattern([{ dose: 0.125 }], { every: n })) : '<div class="entry" style="margin-top:6px">No scheduled doses. 0.25 only for genuinely hard moments, followed only by off days.</div>';
   return `<div class="card" id="widen-card">
-    <div class="card-title">Ready to widen?</div>
-    <div class="steps">${INTERVAL_STEPS.map((n, i) => `<div class="${i < stepIdx ? 'done' : i === stepIdx ? 'cur' : ''}">${n === 0 ? 'none' : n === 7 ? 'weekly' : 'every ' + n}</div>`).join('')}</div>
-    <div class="stat"><span>Days at this step</span><b>${held} of 14</b></div>
-    <div class="bar"><i style="width:${Math.min(100, held / 14 * 100)}%"></i></div>
-    ${stat('How you felt, last 14 days', `${feel14.ok} OK · ${feel14.some} some · ${feel14.rough} rough`)}
-    ${next === undefined ? '' : `
-      ${warn.length ? warn.map(t => noteHtml({ cls: 'warn', t })).join('') : noteHtml({ cls: 'ok', t: 'No widening warnings.' })}
-      <button class="${warn.length ? 'secondary' : 'primary'}" id="widen" style="width:100%;margin-top:12px">Move to ${intervalName(next)}</button>`}
-    ${ivs.length > 1 ? `<button class="secondary" id="undo-widen" style="width:100%;margin-top:10px">Undo last interval change</button>` : ''}
+    <div class="entry">Each step lasts at least 2 weeks. The next step starts on its date by itself. Off days not feeling right? Hold this step a week longer. Hard days never change the step.</div>
+    <div class="ladder cur"><div class="lh"><b>${stepName(every)}</b><span class="here">You are here</span></div>
+      <div class="entry">Since ${fmt(from)} · day ${held + 1}${upcoming.length ? ` · ${diffDays(today, upcoming[0].from)} days to the next step` : ''}</div>${chain(every)}</div>
+    ${upcoming.map(i => `<div class="ladder"><div class="lh"><b>${stepName(i.every)}</b><span class="entry">from ${fmt(i.from)}</span></div>${chain(i.every)}</div>`).join('')}
+    <div class="stat"><span>How you felt, last 14 days</span><b>${feel14.ok} OK · ${feel14.some} so-so · ${feel14.rough} rough</b></div>
+    ${upcoming.length ? `<button class="secondary" id="hold-step" style="width:100%;margin-top:12px">Hold this step 1 more week</button>` : ''}
   </div>`;
 }
-function bindWiden(today) {
-  const { next, warn } = widenState(today);
-  if ($('#widen')) $('#widen').onclick = async () => {
-    const ok = await askConfirm({ title: `Move to ${intervalName(next)}?`, sub: 'Starting today. Only widen if off days have felt fine.', lines: warn, ok: 'Move' });
+function bindSteps(today) {
+  if (!$('#hold-step')) return;
+  $('#hold-step').onclick = async () => {
+    const { every, upcoming } = stepPlan(today);
+    const ok = await askConfirm({ title: `Stay at ${intervalName(every)} a week longer?`, sub: `${stepName(upcoming[0].every)} would start ${fmt(addDays(upcoming[0].from, 7))} instead of ${fmt(upcoming[0].from)}. Later steps move too.`, ok: 'Hold a week' });
     if (!ok) return;
-    S.settings.intervals = S.settings.intervals.filter(i => i.from !== today);
-    S.settings.intervals.push({ from: today, every: next }); save(); render(); buzz();
-    showToast(`Interval: ${intervalName(next)}`);
-  };
-  if ($('#undo-widen')) $('#undo-widen').onclick = async () => {
-    if (!await askConfirm({ title: 'Go back to the previous interval?', ok: 'Go back' })) return;
-    S.settings.intervals.sort((a, b) => a.from.localeCompare(b.from)).pop(); save(); render();
-    showToast('Interval changed back');
+    shiftSteps(today, 7); save(); render(); buzz();
+    showToast(`Next step: ${fmt(addDays(upcoming[0].from, 7))}`, () => { shiftSteps(today, -7); save(); render(); });
   };
 }
 function renderTrends() {
@@ -1661,7 +1699,8 @@ function renderTrends() {
   const ws = warningSigns(today);
   const sleep30 = sleepDaysIn(today, 30);
   const lastHigh = [...days].reverse().find(d => isHigh(dayInfo(d).type));
-  const { every, held } = widenState(today);
+  const { every, held, upcoming } = stepPlan(today);
+  if (!curveWin) curveWin = WIN_FOR[every] || 21;
   const sign = (title, sub, v, flag) => `<div class="sign"><div class="ic ${flag ? 'flagc' : 'okc'}">${flag ? '!' : ICON.check}</div><div class="t">${title}<small>${sub}</small></div><div class="v ${flag ? 'flag' : ''}">${v}</div></div>`;
   const roll = rollingWindows(today);
   const allWeeks = weeklyData(today, 520).length;
@@ -1677,10 +1716,7 @@ function renderTrends() {
   if (sleep30 > 2) reds.push('sleep exceptions');
   const full = roll && roll.cur.days === 7 && roll.prev.days === 7;
   const d7 = full ? roll.cur.total - roll.prev.total : 0;
-  const base = taperBaseline();
-  if (!base && isPct()) curveUnit = 'mg';
-  CURVE = isPct() ? CURVE_PCT : CURVE_MG;
-  const pts = taperCurve(today, curveWin, chartWeeks).map(p => ({ ...p, mg: p.v, v: isPct() ? (base.v - p.v) / base.v * 100 : p.v }));
+  const pts = taperCurve(today, curveWin, chartWeeks);
   const chg = pts.length > 1 ? pts[pts.length - 1].v - pts[0].v : null;
   const rangeName = chartWeeks ? `past ${chartWeeks} weeks` : `since ${short(pts.length ? pts[0].date : today)}`;
   const feel14 = { ok: 0, some: 0, rough: 0 };
@@ -1705,19 +1741,17 @@ function renderTrends() {
     <div class="kpi"><b>${roll ? num(roll.cur.total) : '0'}<small> mg</small></b><span>Last 7 days</span>${full ? `<small class="delta">${Math.abs(d7) < EPS ? 'same as' : (d7 < 0 ? '▼ ' : '▲ ') + num(Math.abs(d7))} vs 7 before</small>` : ''}</div>
     <div class="kpi"><b>${high28}</b><span>High days, last 28</span></div>
     <div class="kpi"><b>${lastHigh ? diffDays(lastHigh, today) : '–'}<small>${lastHigh ? ' days' : ''}</small></b><span>Since last 0.25+</span></div>
-    <button class="kpi tile-link" id="to-plan"><b style="font-size:17px">${capFirst(intervalName(every))}</b><span>Current step</span><small class="delta">${held >= 14 ? `${held} days held ›` : `${held} of 14 days ›`}</small></button>
+    <button class="kpi tile-link" id="to-plan"><b style="font-size:17px">${stepName(every)}</b><span>Current step · day ${held + 1}</span><small class="delta">${upcoming.length ? `next: ${intervalName(upcoming[0].every)}, ${short(upcoming[0].from)} ›` : 'last step ›'}</small></button>
   </div>
   ${allWeeks > 8 ? `<div class="sticky-range">${seg('data-rng', chartWeeks, [[8, '8 weeks'], [16, '16 weeks'], [0, 'All']])}</div>` : ''}
   <div class="card">
-    <div class="card-title curve-title">Taper curve${base ? `<button class="pct-toggle ${isPct() ? 'on' : ''}" id="pct-toggle" aria-pressed="${isPct()}">%</button>` : ''}</div>
-    ${pts.length > 1 ? (isPct() ? (() => { const v = pts[pts.length - 1].v; return `<div class="taper-head">
-      <div class="big-num">${Math.round(Math.abs(v))}%<small> ${v >= 0 ? 'less' : 'more'}</small></div>
-      <div class="sub">than your first 4 weeks · ${num(+base.v.toFixed(2))} → ${num(+pts[pts.length - 1].mg.toFixed(2))} mg / week</div>
-    </div>`; })() : `<div class="taper-head">
+    <div class="card-title">Taper curve</div>
+    ${pts.length > 1 ? `<div class="taper-head">
       <div class="big-num">${num(+pts[pts.length - 1].v.toFixed(2))}<small> mg / week</small></div>
       <div class="sub">${Math.abs(chg) < 0.005 ? 'No change' : `<b class="chg">${chg < 0 ? '▼' : '▲'} ${num(+Math.abs(chg).toFixed(2))}${pts[0].v > EPS ? ` (${chg < 0 ? '−' : '+'}${Math.round(Math.abs(chg) / pts[0].v * 100)}%)` : ''}</b>`} ${rangeName}</div>
-    </div>`) : ''}
+    </div>` : ''}
     ${seg('data-win', curveWin, [[7, '1W'], [14, '2W'], [21, '3W'], [28, '4W']])}
+    ${[3, 4, 7].includes(every) ? `<p class="entry" style="margin:6px 0 0">${curveWin === WIN_FOR[every] ? `${curveWin / 7}W matches ${intervalName(every)}` : `${WIN_FOR[every] / 7}W fits ${intervalName(every)} best`}: it always holds the same number of scheduled doses, so the line only moves when hard days or a new step change your intake.</p>` : ''}
     ${curveHtml(pts)}
     <div class="readout" id="curve-readout">${pts.length > 1 ? curveRead(pts[pts.length - 1]) + '. Tap the chart to see any day.' : ''}</div>
   </div>
@@ -1737,6 +1771,7 @@ function renderTrends() {
       ${weeks.slice().reverse().map(w => `<tr><td>${short(w.start)}${w.partial ? '*' : ''}</td><td>${num(w.total)}</td><td>${num(w.bridge)}</td><td>${num(w.high)}</td><td>${w.dosed}/${w.logged}</td><td>${w.unlogged}</td></tr>`).join('')}
     </table><p class="entry">* partial week</p></details>` : ''}
   </div>
+  ${monthCheckHtml(today)}
   ${(() => { const ms = monthlyData(today); return ms.length > 1 ? `<details class="card fold"><summary class="card-title">Month by month</summary>
     <div class="entry">"Per 7 d" is the average over days you logged, so unfinished months and unlogged days do not drag it down.</div>
     <table class="wk"><tr><th>Month</th><th>mg</th><th>Per 7 d</th><th>Dosed</th><th>High</th></tr>
@@ -1746,7 +1781,6 @@ function renderTrends() {
   $('#to-plan').onclick = () => { tab = 'plan'; render(); setTimeout(() => { const c = $('#widen-card'); if (c) c.scrollIntoView({ block: 'start' }); }, 50); };
   document.querySelectorAll('[data-rng]').forEach(b => b.onclick = () => { chartWeeks = +b.dataset.rng; renderTrends(); });
   document.querySelectorAll('[data-win]').forEach(b => b.onclick = () => { curveWin = +b.dataset.win; renderTrends(); });
-  if ($('#pct-toggle')) $('#pct-toggle').onclick = () => { curveUnit = isPct() ? 'mg' : 'pct'; renderTrends(); };
   document.querySelectorAll('.chart .hit').forEach(h => h.onclick = () => {
     document.querySelectorAll('.chart .bg').forEach(o => o.classList.toggle('on', o.dataset.bg === h.dataset.wk));
     $('#wk-readout').innerHTML = weekReadout(weeks[+h.dataset.wk]);
@@ -1769,31 +1803,32 @@ function renderSettings() {
   <div class="card"><div class="card-title">Plan settings</div>
     <label class="f">Name at the top <input id="s-name" value="${esc(st.medName)}"></label>
     <label class="f">Bridge start date <input id="s-start" type="date" value="${st.startDate}"></label>
-    <p class="entry">Earliest first widening: ${fmt(widenEarliest())} (start + 14). "Skip 3" option: from ${fmt(unlockSkip3())} (start + 21).</p>
-    <label class="f">Current interval
+    <p class="entry">Steps: ${(() => { const sp = stepPlan(logicalToday()); return [`${intervalName(sp.every)} now`, ...sp.upcoming.map(i => `${intervalName(i.every)} from ${short(i.from)}`)].join(' → '); })()}. Changing the step here plans the next ones 14 days apart from today.</p>
+    <label class="f">Current step
       <select id="s-int">${INTERVAL_STEPS.map(n => `<option value="${n}" ${intervalOn(logicalToday()) === n ? 'selected' : ''}>${intervalName(n)}</option>`).join('')}</select></label>
     <button class="primary" id="s-save">Save settings</button>
   </div>
   <div class="card rules"><details><summary class="card-title" style="display:block">Plan rules (reference)</summary>
     <p><b>Patterns</b></p>
     <ul>
-      <li><b>Normal:</b> 0.125 → 0 → 0.125 → 0 → 0.125</li>
+      <li><b>Normal (every 3rd day):</b> 0.125 → 0 → 0 → 0.125 → 0 → 0 → 0.125</li>
       <li><b>Hard day:</b> 0.25 → 0 → 0 → 0.125</li>
-      <li><b>Hard 2 days:</b> 0.25 → 0.25 → 0 → 0 → 0.125</li>
-      <li><b>Hard 3 days, same emergency:</b> 0.25 → 0.25 → 0.25 → 0 → 0 → 0.125. No 4th day of 0.25; if the emergency is still going on day 4, get medical advice. From Oct 21, if off days have felt fine: 3 off days after a 3-day run is OK.</li>
-      <li><b>Hard day during the 2 off-days:</b> 0.25 → 0 → 0.25 → 0 → 0 → 0.125. The new 0.25 restarts the count.</li>
+      <li><b>Hard 2 days:</b> 0.25 → 0.25 → 0 → 0 → 0 → 0.125</li>
+      <li><b>More than 0.25 in a day</b> (e.g. 0.375 sleep exception): 0.375 → 0 → 0 → 0 → 0.125</li>
+      <li><b>Hard 3 days, same emergency:</b> 0.25 → 0.25 → 0.25 → 0 → 0 → 0 → 0.125. No 4th day of 0.25; if the emergency is still going on day 4, get medical advice.</li>
+      <li><b>Hard day during the off days:</b> 0.25 → 0 → 0.25 → 0 → 0 → 0.125. The new 0.25 restarts the count.</li>
     </ul>
     <p><b>Detailed rules</b></p>
     <ul>
       <li><b>A day:</b> a dose before 6 AM, or marked "haven't slept yet", belongs to the previous day. Day total: 0 off, 0.125 bridge, 0.25 to 0.375 high, 0.5+ very high.</li>
       <li><b>After a bridge day:</b> next 0.125 after the current interval.</li>
-      <li><b>After a high day or run:</b> off days = larger of 2 or (interval − 1), then 0.125. After a very high day: larger of 3 or (interval − 1).</li>
-      <li><b>After a 3-day high run:</b> default 2 off days. "Skip 3" is an option from start + 21 days with no tremor dose in the last 14 days.</li>
+      <li><b>After a single 0.25 day:</b> off days = larger of 2 or (interval − 1), then 0.125.</li>
+      <li><b>After more than 0.25 in a day, or 2+ high days in a row:</b> off days = larger of 3 or (interval − 1), then 0.125.</li>
       <li><b>Interval none:</b> no scheduled 0.125; nothing follows a high day.</li>
       <li><b>A new high day during off days</b> restarts the count.</li>
       <li><b>Late 0.125:</b> take it once, the day it's remembered. Count restarts from that day.</li>
       <li><b>Tremor dose:</b> allowed unless there was any dose yesterday. Restarts the count like a normal 0.125.</li>
-      <li><b>Intervals:</b> 2 → 3 → 4 → 7 → none, by button only. Earliest first widening start + 14. Warn if under 14 days at the step or any tremor dose in the last 14 days. High days never change the interval.</li>
+      <li><b>Steps:</b> every 3rd day from Nov 1, then every 4th, weekly, none, each at least 2 weeks. Each step starts on its date by itself; hold a week on the Plan tab if off days don't feel right. Hard days never push the schedule back.</li>
       <li><b>Hard limits:</b> above 0.25/day (except 0.375 with the extra 0.25 at night for sleep). 0.125 two days in a row. 4th high day in a row. Sleep exception two nights in a row or more than twice in 30 days.</li>
       <li><b>Warning signs:</b> 2+ tremor doses in 30 days. More than one very high day. 3+ high days in 7 days not in one run. High days rising two 28-day blocks in a row.</li>
     </ul></details></div>
@@ -1815,11 +1850,7 @@ function renderSettings() {
       st.startDate = start;
     }
     const every = +$('#s-int').value, today = logicalToday();
-    if (every !== intervalOn(today)) {
-      const from = today < start ? start : today;
-      st.intervals = st.intervals.filter(i => i.from !== from);
-      st.intervals.push({ from, every });
-    }
+    if (every !== intervalOn(today)) scheduleSteps(today < start ? start : today, every);
     save(); render(); showToast('Settings saved');
   };
   $('#wipe').onclick = async () => {
@@ -1879,7 +1910,7 @@ function logText(range = 'all') {
   const label = range === 'all' ? 'all days' : range === 'sum' ? 'summary only, last 28 days' : `last ${range} days`;
   const lines = [`DOSE LOG (${st.medName}), exported ${today}, ${label}`,
     `Plan start: ${st.startDate}. Current interval: ${intervalName(intervalOn(today))}.`,
-    `Interval history: ${[...st.intervals].sort((a, b) => a.from.localeCompare(b.from)).map(i => `${i.from} ${intervalName(i.every)}`).join('; ')}`,
+    `Interval history and planned steps: ${[...st.intervals].sort((a, b) => a.from.localeCompare(b.from)).map(i => `${i.from} ${intervalName(i.every)}${i.from > today ? ' (planned)' : ''}`).join('; ')}`,
     '', `SUMMARY (${from} to ${today}, ${nDays} days)`,
     `Total: ${num(total)} mg (bridge days ${num(bridge)}, high days ${num(high)}). About ${num(total / nDays * 7)} mg per 7 days.`,
     `Days dosed: ${dosed} of ${nDays}. High days: ${highDays} (SOS ${sosDays}, sleep exception ${sleepDays}). Very high days: ${vhighDays}.`,

@@ -73,33 +73,34 @@ Live URL: https://mrjsm2024.github.io/Workout-Tracker/ (capital W and T: Pages p
   range bar (8 / 16 / All weeks, `chartWeeks`) driving the taper curve, day grid and weekly chart; taper curve is one clean line like a price chart
   (owner's preference: no extra lines, dots or markers) with 1W / 2W / 3W / 4W averaging toggles (`curveWin`, default 21
   days: almost as smooth as 4W on the owner's every-other-day rhythm, reacts a week sooner), a big current value and the
-  change over the visible range. A single % switch beside the card title (`curveUnit`) switches the same line to "% less than your first 4 logged
-  weeks" (`taperBaseline()`); mg stays the default; month table is folded. The widening card lives on the Plan tab
-  (`widenCardHtml()` / `bindWiden()`). Plan folds sleep, tremor and other-med scenarios under "More situations".
+  change over the visible range. mg only (the % view was removed Nov 1: owner found it unhelpful). Default window comes from
+  the current step (`WIN_FOR`: a whole number of dose cycles, so a steady schedule draws a flat line: 3W at every 3rd, 4W at
+  every 4th). "Is it working?" card (`monthCheck()`): dose days and mg this month vs the same days last month (full months
+  once a month ends); month table is folded. The Steps card lives on the Plan tab (`stepsCardHtml()` / `bindSteps()`).
+  Plan patterns are simulated at the current step. Plan folds sleep, tremor and other-med scenarios under "More situations".
 - Check-ins appear in History, the copied log, and the Widening card (last 14 days).
 
-## Rules logic (spec v2, from the owner's plan thread; in `planFor()`, `checks()`, `warningSigns()`)
+## Rules logic (v3 from Nov 1, 2026, from the owner's medical research thread; in `planFor()`, `checks()`, `warningSigns()`)
 - The rules apply only from the plan start date (`inPlan()`, `planDay()`). Days before it (owner's earlier routine,
   Jul 10 to Sep 29) are kept for charts and totals, but the plan engine and warning signs ignore them.
 - Day: a dose before 6 AM, or marked "haven't slept yet", belongs to the previous day.
 - Day types by total: off 0, bridge 0.125, high 0.25 to 0.375, very high above 0.375.
 - After a bridge (scheduled, late or tremor): next 0.125 after the current interval.
-- After a high run: off days = max(2, interval - 1); with a very high day: max(3, interval - 1). Then 0.125.
-- 3rd off day (owner's rule, Oct 28): a single day of 0.5+ gives 3 off days by default (very high rule). A 3rd off day is
-  an OPTION after 2 high days in a row adding up to 0.625 or more (e.g. 0.375 + 0.25, either order) or 3 high days in a
-  row; anything less is 2 off days; 0.125 days don't count. No date or tremor conditions. On the choice day the plan is
-  "0.125 or off" (`skip3`, hero button "3rd off day"); an off entry that day counts as planned, so no "late" next day.
-  Only applies where off days would be 2 (interval every 2 or 3).
+- After a single 0.25 day: off days = max(2, interval - 1). After a day above 0.25 (0.375 sleep exception included) or
+  2+ high days in a row (`heavyRun()`): max(3, interval - 1). Then 0.125 (`offDaysAfter()`). The Oct 28 optional
+  "3rd off day" rule (`skip3`) is superseded and removed.
 - Interval "none": no scheduled 0.125, nothing follows a high day.
 - Tremor dose: warn if any dose yesterday.
 - "Other medication" entries (reason othermed) are notes only: dose 0, amount + name in the note.
   The day after one, a due 0.125 shows as "0.125 or off" (owner decides).
-- Widening (2 → 3 → 4 → 7 → none) by button only. Warn if before bridge start + 14, under 14 days
-  at the step, or any tremor dose in the last 14 days. High days never change the interval.
+- Steps (v3): every 3rd day from Nov 1 (`PHASE3_START`), then planned steps in `settings.intervals` with `auto: true`:
+  every 4th Nov 16, weekly Nov 30, none Dec 14 (`PHASE3_STEPS`, 14 days apart). Planned steps start on their date by
+  themselves, no widen button. "Hold this step 1 more week" shifts all future steps +7 days (`shiftSteps()`, with Undo).
+  Settings "Current step" restarts the ladder from today (`scheduleSteps()`). High days never change the step.
 - Hard limits (warn, never block): above 0.25/day unless sleep exception (max 0.375), 0.125 two days
   in a row, 4th high day in a row, sleep exception two nights in a row or more than 2 in rolling 30 days.
 - Warning signs: 2+ tremor doses in rolling 30 days; more than one very high day; 3+ high days within
   7 days that aren't one consecutive run; high days rising across three consecutive 28-day blocks.
 - Trends tab: weekly mg stacked bar chart (Mon to Sun, bridge vs high, last 12 weeks) with tap readout
   and table; weekly totals are also appended to the copied log.
-- Bridge start: Sep 30, 2026 (settings.startDate). Old v1 data is migrated in `migrate()`.
+- Bridge start: Sep 30, 2026 (settings.startDate). Old data is migrated in `migrate()` (v3 rewrites intervals from Nov 1).
